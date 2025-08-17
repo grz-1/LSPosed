@@ -1,53 +1,44 @@
 # LSPosed Framework
 
-[![Build](https://img.shields.io/github/actions/workflow/status/re-zero001/LSPosed/core.yml?branch=master&event=push&logo=github&label=Build)](https://github.com/re-zero001/LSPosed/actions/workflows/core.yml?query=event%3Apush+branch%3Amaster+is%3Acompleted) [![Channel](https://img.shields.io/badge/Follow-Telegram-blue.svg?logo=telegram)](https://t.me/LSPosed) [![Download](https://img.shields.io/github/v/release/LSPosed/LSPosed?color=orange&logoColor=orange&label=Download&logo=DocuSign)](https://github.com/re-zero001/LSPosed/releases/latest) [![Total](https://shields.io/github/downloads/LSPosed/LSPosed/total?logo=Bookmeter&label=Counts&logoColor=yellow&color=yellow)](https://github.com/LSPosed/LSPosed/releases)
+## 介绍 
+一个Zygisk模块，用于提供一个ART钩子框架，使用LSPlant来提供与Xposed的API。
 
-## Introduction 
+> Xposed 是一个框架，可以改变系统和应用程序的行为，而无需触碰任何软件的包体。这听起来确实很棒，对吧？因为这意味着模块可以在不同的版本甚至 ROM 上正常运行，而无需任何更改（只要开发者不要写的太死板）。它也很容易关掉。由于所有更改都是在内存中完成的，您只需停用模块并重启即可恢复原来的样子。还有许多其他优点，但这里再提一个：多个模块可以对系统或应用程序的同一部分进行更改，您必须选择一个。除非开发者们构建多个具有不同组合的模块，否则没办法把它们结合在一起。
 
-A Zygisk module trying to provide an ART hooking framework which delivers consistent APIs with the OG Xposed, leveraging LSPlant hooking framework.
+## 支持的 Android 版本
 
-> Xposed is a framework for modules that can change the behavior of the system and apps without touching any APKs. That's great because it means that modules can work for different versions and even ROMs without any changes (as long as the original code was not changed too much). It's also easy to undo. As all changes are done in the memory, you just need to deactivate the module and reboot to get your original system back. There are many other advantages, but here is just one more: multiple modules can do changes to the same part of the system or app. With modified APKs, you have to choose one. No way to combine them, unless the author builds multiple APKs with different combinations.
+Android 8.1 ~ 16
 
-## Supported Versions
+## 安装方法
 
-Android 8.1 ~ 15
+1. 安装 Magisk 或者 KernelSU （包括它们的分支），但要确保 MAGISK_VER_CODE 高于 26000
+2. 安装 [ZygiskNext](https://github.com/Dr-TSNG/ZygiskNext/releases) 或者 [ReZygisk](https://github.com/PerformanC/ReZygisk)
+> 不推荐使用Magisk自带的Zygisk功能
+3. [Download](#下载)然后安装LSPosed模块
+4. 重启
+5. 尝试打开LSPosed管理器吧，无论使用Actions按钮还是通知，又或是拨打*#*#5776733*#*#，这些都是好办法
+6. 玩的开心
 
-## Install
+## 下载
 
-1. Install Magisk v26+
-2. Install [ZygiskNext](https://github.com/Dr-TSNG/ZygiskNext/releases)
-> No need enable zygisk in magisk.
-3. [Download](#download) and install LSPosed in Magisk app
-4. Reboot
-5. Open LSPosed manager from notification
-6. Have fun :)
+- 如果你追求稳定，请前往[Github Releases page](https://github.com/re-zero001/LSPosed/releases)
+- 如果你想要最新的功能，看看这里[Github Actions](https://github.com/re-zero001/LSPosed/actions/workflows/core.yml?query=branch%3Adev)
+> 注意Actions的下载需要登录GitHub
 
-## Download
+## 获取帮助
 
-- For stable releases, please go to [Github Releases page](https://github.com/re-zero001/LSPosed/releases)
-- For canary build, please check [Github Actions](https://github.com/re-zero001/LSPosed/actions/workflows/core.yml?query=branch%3Adev)
+**我们只收集**最新的构建**的问题**
+- GitHub issues: [Issues](https://github.com/PKQISPKQ/LSPosed-Toop/issues/)
 
-## Get Help
+## 开发者们
 
-**Only bug reports from **THE LATEST DEBUG BUILD** will be accepted.**
-- GitHub issues: [Issues](https://github.com/re-zero001/LSPosed/issues/)
-- (For Chinese speakers) 本项目只接受英语**标题**的issue。如果您不懂英语，请使用[翻译工具](https://www.deepl.com/zh/translator)
-
-## For Developers
-
-Developers are welcome to write Xposed modules with hooks based on LSPosed Framework. A module based on LSPosed framework is fully compatible with the original Xposed Framework, and vice versa, a Xposed Framework-based module will work well with LSPosed framework too.
+欢迎编写基于 LSPosed 框架的 Xposed 模块。基于 LSPosed 框架的模块与原始 Xposed 框架完全兼容，反之，基于 Xposed 框架的模块也能够很好地与 LSPosed 框架配合使用。
 
 - [Xposed Framework API](https://api.xposed.info/)
 
-We use our own module repository. We welcome developers to submit modules to our repository, and then modules can be downloaded in LSPosed.
+原版LSPosed开发者拥有他们自己的模块库。我们欢迎开发者向他们的库提交模块，然后可以在LSPosed中下载这些模块。
 
 - [LSPosed Module Repository](https://github.com/Xposed-Modules-Repo)
-
-## Community Discussion
-
-- Telegram: [@LSPosed](https://t.me/s/LSPosed)
-
-Notice: These community groups don't accept any bug report, please use [Get help](#get-help) to report.
 
 ## Credits 
 
@@ -67,4 +58,4 @@ Notice: These community groups don't accept any bug report, please use [Get help
 
 ## License
 
-LSPosed is licensed under the **GNU General Public License v3 (GPL-3)** (http://www.gnu.org/copyleft/gpl.html).
+LSPosed使用了**GNU General Public License v3 (GPL-3)** (http://www.gnu.org/copyleft/gpl.html)协议。
