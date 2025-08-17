@@ -1,6 +1,6 @@
 id=${moduleId}
 name=LSPosed IT (GitHub@PKQandBaaad)
-version=v${versionName}-it (${versionCode})
+version=${versionName}-it (${versionCode})
 versionCode=${versionCode}
 author=${authorList}
 description=Another enhanced implementation of Xposed Framework. Supports Android 8.1 ~ 16. Requires Magisk 24.0+ and Zygisk enabled.
