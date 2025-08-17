@@ -83,8 +83,8 @@ jobs:
         if: success()
         id: prepareArtifact
         run: |
-          zygiskReleaseName=`ls magisk-loader/release/LSPosed-v*-Irena-release.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskReleaseName=$zygiskReleaseName" >> $GITHUB_OUTPUT
-          zygiskDebugName=`ls magisk-loader/release/LSPosed-v*-Irena-debug.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskDebugName=$zygiskDebugName" >> $GITHUB_OUTPUT
+          zygiskReleaseName=`ls magisk-loader/release/LSPosed-v*-Irena-release.zip | sed 's/-Irena//' | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskReleaseName=$zygiskReleaseName" >> $GITHUB_OUTPUT
+          zygiskDebugName=`ls magisk-loader/release/LSPosed-v*-Irena-debug.zip | sed 's/-Irena//' | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskDebugName=$zygiskDebugName" >> $GITHUB_OUTPUT
           unzip magisk-loader/release/LSPosed-v*-Irena-release.zip -d LSPosed-release
           unzip magisk-loader/release/LSPosed-v*-Irena-debug.zip -d LSPosed-debug
 
