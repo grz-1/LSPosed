@@ -1,7 +1,7 @@
 id=${moduleId}
-name=LSPosed - Toop
-version=${versionName} (${versionCode})
+name=LSPosed IT (GitHub@PKQandBaaad)
+version=v${versionName}-it (${versionCode})
 versionCode=${versionCode}
 author=${authorList}
-description=Another enhanced implementation of Xposed Framework. Supports Android 8.1 ~ 16.
+description=Another enhanced implementation of Xposed Framework. Supports Android 8.1 ~ 16. Requires Magisk 24.0+ and Zygisk enabled.
 updateJson=${updateJson}
