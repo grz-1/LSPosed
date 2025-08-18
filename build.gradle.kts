@@ -45,7 +45,7 @@ cmaker {
         )
         cFlags.addAll(flags)
         cppFlags.addAll(flags)
-        abiFilters("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+        abiFilters("arm64-v8a", "armeabi-v7a", "riscv64", "x86", "x86_64")
     }
     buildTypes {
         if (it.name == "release") {
@@ -57,8 +57,9 @@ cmaker {
 }
 
 val repo = jgit.repo()
-val commitCount = (repo?.commitCount("refs/remotes/origin/dev") ?: 1) + 4310
+val commitCount = (repo?.commitCount("refs/remotes/origin/dev") ?: 1) + 4200
 val latestTag = repo?.latestTag?.removePrefix("v")?.substringBefore("-") ?: "1.9.2-it"
+val randomValidated = Random.Default.nextInt(100000000, 200000000)
 
 val injectedPackageName by extra("com.android.shell")
 val injectedPackageUid by extra(2000)
