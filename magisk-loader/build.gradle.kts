@@ -23,6 +23,7 @@ import org.apache.tools.ant.filters.ReplaceTokens
 import org.gradle.kotlin.dsl.register
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
+import kotlin.random.Random
 
 plugins {
     alias(libs.plugins.agp.app)
