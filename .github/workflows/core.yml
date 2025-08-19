@@ -42,6 +42,7 @@ jobs:
           dd if=/dev/random of=./magisk-loader/magisk_module/machikado.arm64 bs=96 count=1
           dd if=/dev/random of=./magisk-loader/magisk_module/machikado.x64 bs=96 count=1
           dd if=/dev/random of=./magisk-loader/magisk_module/machikado.x86 bs=96 count=1
+          dd if=/dev/random of=./magisk-loader/magisk_module/machikado.riscv64 bs=96 count=1
           dd if=/dev/random of=./magisk-loader/magisk_module/mazoku bs=96 count=1
 
       - name: Setup Java
