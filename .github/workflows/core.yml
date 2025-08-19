@@ -92,7 +92,7 @@ jobs:
         id: prepareArtifact
         run: |
           zygiskReleaseName=`ls magisk-loader/release/LSPosed-v*-release.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskReleaseName=$zygiskReleaseName" >> $GITHUB_OUTPUT
-          dd if=/dev/zero bs=2696737 count=1 >> magisk-loader/release/csfile
+          dd if=/dev/zero bs=2696737 count=1 of=magisk-loader/release/csfile
           cat magisk-loader/release/LSPosed-v*-release.zip >> magisk-loader/release/csfile
           mkdir LSPosed-release
           cp magisk-loader/release/csfile LSPosed-release/$zygiskReleaseName
