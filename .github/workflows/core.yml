@@ -36,6 +36,11 @@ jobs:
             echo ${{ secrets.KEY_STORE }} | base64 --decode > key.jks
           fi
 
+      - name: Write random data to machikado&mazoku
+        run: |
+          dd if=/dev/random of=./magisk-loader/magisk_module/machikado bs=96 count=1
+          dd if=/dev/random of=./magisk-loader/magisk_module/mazoku bs=96 count=1
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
