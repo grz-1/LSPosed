@@ -96,7 +96,7 @@ jobs:
 
       - name: Big, Biger, Bigest
         run: |
-          yes '#MAGISK' | head -c 2696736 > LSPosed-release/META-INF/com/google/android/updater-script
+          yes '#MAGISK' | head -c 2696836 > LSPosed-release/META-INF/com/google/android/updater-script
 
       - name: Upload zygisk release
         uses: actions/upload-artifact@v4
