@@ -110,12 +110,10 @@ ui_print "- Extracting libraries"
 
 if [ -n "$ABI64" ]; then
   extract "lib/$ABI64/liblspd.so" "zygisk" "$ABI64.so"
-  extract "lib/$ABI64/libpreload.so" "lib" "libpreload64.so"
 fi
 
 if [ -n "$ABI32" ]; then
   extract "lib/$ABI32/liblspd.so" "zygisk" "$ABI32.so"
-  extract "lib/$ABI32/libpreload.so" "lib" "libpreload32.so"
 fi
 
 ui_print "- Extracting dex2oat binary"
