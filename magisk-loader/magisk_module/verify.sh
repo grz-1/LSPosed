@@ -28,19 +28,21 @@ abort_verify() {
   abort    "*********************************************************"
 }
 
-# extract <zip> <file> <target dir> <junk paths>
-extract() {
-  zip=$1
-  file=$2
-  dir=$3
-  junk_paths=$4
-  [ -z "$junk_paths" ] && junk_paths=false
+# do_extract <junk> <zip> <file> <target dir> [name]
+do_extract() {
+  junk=$1
+  zip=$2
+  file=$3
+  dir=$4
+  name=$5
   opts="-o"
-  [ $junk_paths = true ] && opts="-oj"
+  if [ "$junk" = true ]; then
+    opts="-oj"
+  fi
 
   file_path=""
   hash_path=""
-  if [ $junk_paths = true ]; then
+  if [ "$junk" = true ]; then
     file_path="$dir/$(basename "$file")"
     hash_path="$TMPDIR_FOR_VERIFY/$(basename "$file").sha256"
   else
@@ -55,7 +57,26 @@ extract() {
   [ -f "$hash_path" ] || abort_verify "$file.sha256 not exists"
 
   (echo "$(cat "$hash_path")  $file_path" | sha256sum -c -s -) || abort_verify "Failed to verify $file"
-  ui_print "- Verified $file" >&1
+
+  if [ -n "$name" ]; then
+    real_path="$(dirname "$file_path")/$name"
+    mv "$file_path" "$real_path" || abort "failed to rename $file_path to $name"
+    ui_print "- extract $file -> $real_path" >&1
+  else
+    ui_print "- extract $file -> $file_path" >&1
+  fi
+}
+
+# extract <path-in-zip> [out dir in MODPATH] [name]
+extract() {
+  if [ -n "$2" ]; then
+    junk="true"
+    out="$MODPATH/$2"
+  else
+    junk="false"
+    out="$MODPATH"
+  fi
+  do_extract "$junk" "$ZIPFILE" "$1" "$out" "$3"
 }
 
 file="META-INF/com/google/android/update-binary"

@@ -21,6 +21,6 @@ MODDIR=${0%/*}
 
 rm -f "/data/local/tmp/daemon.apk"
 rm -f "/data/local/tmp/manager.apk"
-cd "$MODDIR"
+cd "$MODDIR" || exit
 
-unshare --propagation slave -m sh -c "$MODDIR/daemon $@&"
+"$MODDIR/daemon" "$@" &
