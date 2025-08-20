@@ -152,7 +152,7 @@
     <PreferenceCategory android:title="@string/settings_fake_hook">
         <rikka.material.preference.MaterialSwitchPreference
             android:defaultValue="false"
-            android:icon="@drawable/ic_outline_android_24"
+            android:icon="@drawable/troubleshoot_48"
             android:key="fakehookdebug"
             android:persistent="true"
             android:summary="@string/settings_fake_hook_debug_summary"
