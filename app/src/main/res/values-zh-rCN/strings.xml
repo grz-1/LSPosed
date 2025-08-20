@@ -189,6 +189,11 @@
     <string name="update_channel_nightly">每夜版</string>
     <string name="settings_xposed_api_call_protection">Xposed API 调用保护</string>
     <string name="settings_xposed_api_call_protection_summary">阻止模块动态加载的代码使用 Xposed API，这会使某些模块失效，但有利于安全性</string>
+    <string name="settings_fake_hook">调试</string>
+    <string name="settings_fake_hook_debug">Hook 调试</string>
+    <string name="settings_fake_hook_debug_summary">允许转储被 hook 进程的 hook 调试信息，可能带来性能影响</string>
+    <string name="settings_fake_dump_hook_debug_info">转储 Hook 调试信息</string>
+    <string name="settings_fake_dump_hook_debug_info_summary">转储 Hook 调试信息到 /data/adb/lspd/log</string>
     <!-- Module Repo -->
     <string name="module_readme">自述文件</string>
     <string name="module_releases">版本</string>
