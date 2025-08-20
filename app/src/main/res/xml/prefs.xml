@@ -152,13 +152,13 @@
     <PreferenceCategory android:title="@string/settings_fake_hook">
         <rikka.material.preference.MaterialSwitchPreference
             android:defaultValue="false"
-            android:icon="@drawable/troubleshoot_48"
+            android:icon="@drawable/troubleshoot"
             android:key="fakehookdebug"
             android:persistent="true"
             android:summary="@string/settings_fake_hook_debug_summary"
             android:title="@string/settings_fake_hook_debug" />
         <Preference
-            android:icon="@drawable/file_present_48"
+            android:icon="@drawable/file_present"
             android:key="fakedumphookdebuginfo"
             android:summary="@string/settings_fake_dump_hook_debug_info_summary"
             android:title="@string/settings_fake_dump_hook_debug_info" />
