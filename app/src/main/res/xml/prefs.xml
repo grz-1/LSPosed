@@ -148,4 +148,19 @@
             android:summary="@string/settings_show_hidden_icon_apps_enabled_summary"
             android:title="@string/settings_show_hidden_icon_apps_enabled" />
     </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/settings_fake_hook">
+        <rikka.material.preference.MaterialSwitchPreference
+            android:defaultValue="false"
+            android:icon="@drawable/ic_outline_android_24"
+            android:key="fakehookdebug"
+            android:persistent="true"
+            android:summary="@string/settings_fake_hook_debug_summary"
+            android:title="@string/settings_fake_hook_debug" />
+        <Preference
+            android:icon="@drawable/ic_outline_android_24"
+            android:key="fakedumphookdebuginfo"
+            android:summary="@string/settings_fake_dump_hook_debug_info_summary"
+            android:title="@string/settings_fake_dump_hook_debug_info" />
+    </PreferenceCategory>
 </PreferenceScreen>
