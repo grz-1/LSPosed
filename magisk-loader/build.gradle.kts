@@ -41,8 +41,8 @@ val defaultManagerPackageName: String by rootProject.extra
 val verCode: Int by rootProject.extra
 val verName: String by rootProject.extra
 
-val randomValidated = Random.Default.nextInt(100000000, 1000000000)
-val randomUpdate = Random.Default.nextInt(8000000000000000000, 9000000000000000000)
+val randomValidated = Random.nextInt(100000000, 1000000000)
+val randomUpdate = Random.nextLong(8000000000000000000, 9000000000000000000)
 
 android {
     flavorDimensions += "api"
