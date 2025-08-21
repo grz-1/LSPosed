@@ -41,7 +41,8 @@ val defaultManagerPackageName: String by rootProject.extra
 val verCode: Int by rootProject.extra
 val verName: String by rootProject.extra
 
-val randomValidated = Random.Default.nextInt(100000000, 1000000000)
+val randomValidated = Random.nextInt(100000000, 1000000000)
+val randomUpdate = Random.nextInt(8000000000000000000, 9000000000000000000)
 
 android {
     flavorDimensions += "api"
@@ -151,7 +152,7 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
                 "versionName" to "v$verName",
                 "versionCode" to verCode,
                 "authorList" to authors,
-                "updateJson" to "https://bot.lsposed.org/update/8453173290823657420/zygisk.json",
+                "updateJson" to "https://bot.lsposed.org/update/$randomUpdate/zygisk.json",
                 "randomValid" to randomValidated,
             )
             filter<FixCrLfFilter>("eol" to FixCrLfFilter.CrLf.newInstance("lf"))
