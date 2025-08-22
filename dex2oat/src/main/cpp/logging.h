@@ -1,6 +1,8 @@
 #pragma once
 
 #include <android/log.h>
+#include <string.h>
+#include <errno.h>
 
 #ifndef LOG_TAG
 #define LOG_TAG "LSPosedDex2Oat"
