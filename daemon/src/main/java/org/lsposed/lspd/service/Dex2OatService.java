@@ -26,6 +26,7 @@ import static org.lsposed.lspd.ILSPManagerService.DEX2OAT_SELINUX_PERMISSIVE;
 import static org.lsposed.lspd.ILSPManagerService.DEX2OAT_SEPOLICY_INCORRECT;
 
 import android.net.LocalServerSocket;
+import android.net.LocalSocket;
 import android.os.Build;
 import android.os.FileObserver;
 import android.os.Process;
@@ -41,12 +42,14 @@ import androidx.annotation.RequiresApi;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 
 @RequiresApi(Build.VERSION_CODES.Q)
-public class Dex2OatService implements Runnable {
+public class Dex2OatService implements Runnable, AutoCloseable {
     private static final String TAG = "LSPosedDex2Oat";
     private static final String WRAPPER32 = "bin/dex2oat32";
     private static final String WRAPPER64 = "bin/dex2oat64";
@@ -55,94 +58,126 @@ public class Dex2OatService implements Runnable {
     private final FileDescriptor[] fdArray = new FileDescriptor[4];
     private final FileObserver selinuxObserver;
     private int compatibility = DEX2OAT_OK;
-
-    private void openDex2oat(int id, String path) {
-        try {
-            var fd = Os.open(path, OsConstants.O_RDONLY, 0);
-            dex2oatArray[id] = path;
-            fdArray[id] = fd;
-        } catch (ErrnoException ignored) {
-        }
-    }
+    private Thread serviceThread;
 
     public Dex2OatService() {
+        initDex2oatPaths();
+        selinuxObserver = initSelinuxObserver();
+    }
+
+    private void initDex2oatPaths() {
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
-            openDex2oat(Process.is64Bit() ? 2 : 0, "/apex/com.android.runtime/bin/dex2oat");
-            openDex2oat(Process.is64Bit() ? 3 : 1, "/apex/com.android.runtime/bin/dex2oatd");
+            boolean is64Bit = Process.is64Bit();
+            openDex2oat(is64Bit ? 2 : 0, "/apex/com.android.runtime/bin/dex2oat");
+            openDex2oat(is64Bit ? 3 : 1, "/apex/com.android.runtime/bin/dex2oatd");
         } else {
             openDex2oat(0, "/apex/com.android.art/bin/dex2oat32");
             openDex2oat(1, "/apex/com.android.art/bin/dex2oatd32");
             openDex2oat(2, "/apex/com.android.art/bin/dex2oat64");
             openDex2oat(3, "/apex/com.android.art/bin/dex2oatd64");
         }
+    }
 
+    private FileObserver initSelinuxObserver() {
         var enforce = Paths.get("/sys/fs/selinux/enforce");
         var policy = Paths.get("/sys/fs/selinux/policy");
         var list = new ArrayList<File>();
         list.add(enforce.toFile());
         list.add(policy.toFile());
-        selinuxObserver = new FileObserver(list, FileObserver.CLOSE_WRITE) {
+        
+        return new FileObserver(list, FileObserver.CLOSE_WRITE) {
             @Override
             public synchronized void onEvent(int i, @Nullable String s) {
-                Log.d(TAG, "SELinux status changed");
-                if (compatibility == DEX2OAT_CRASHED) {
-                    stopWatching();
-                    return;
-                }
-
-                boolean enforcing = false;
-                try (var is = Files.newInputStream(enforce)) {
-                    enforcing = is.read() == '1';
-                } catch (IOException ignored) {
-                }
-
-                if (!enforcing) {
-                    if (compatibility == DEX2OAT_OK) doMount(false);
-                    compatibility = DEX2OAT_SELINUX_PERMISSIVE;
-                } else if (SELinux.checkSELinuxAccess("u:r:untrusted_app:s0",
-                        "u:object_r:dex2oat_exec:s0", "file", "execute")
-                        || SELinux.checkSELinuxAccess("u:r:untrusted_app:s0",
-                        "u:object_r:dex2oat_exec:s0", "file", "execute_no_trans")) {
-                    if (compatibility == DEX2OAT_OK) doMount(false);
-                    compatibility = DEX2OAT_SEPOLICY_INCORRECT;
-                } else if (compatibility != DEX2OAT_OK) {
-                    doMount(true);
-                    if (notMounted()) {
-                        doMount(false);
-                        compatibility = DEX2OAT_MOUNT_FAILED;
-                        stopWatching();
-                    } else {
-                        compatibility = DEX2OAT_OK;
-                    }
-                }
+                checkSelinuxStatus();
             }
 
             @Override
             public void stopWatching() {
                 super.stopWatching();
-                Log.w(TAG, "SELinux observer stopped");
             }
         };
+    }
+
+    private void openDex2oat(int id, String path) {
+        try {
+            var fd = Os.open(path, OsConstants.O_RDONLY, 0);
+            dex2oatArray[id] = path;
+            fdArray[id] = fd;
+        } catch (ErrnoException e) {
+            Log.e(TAG, "Failed to open " + path, e);
+        }
+    }
+
+    private void checkSelinuxStatus() {
+        if (compatibility == DEX2OAT_CRASHED) {
+            selinuxObserver.stopWatching();
+            return;
+        }
+
+        boolean enforcing = false;
+        try (var is = Files.newInputStream(Paths.get("/sys/fs/selinux/enforce"))) {
+            enforcing = is.read() == '1';
+        } catch (IOException ignored) {
+        }
+
+        if (!enforcing) {
+            if (compatibility == DEX2OAT_OK) doMount(false);
+            compatibility = DEX2OAT_SELINUX_PERMISSIVE;
+        } else {
+            checkSelinuxAccess();
+        }
+    }
+
+    private void checkSelinuxAccess() {
+        boolean hasAccess = SELinux.checkSELinuxAccess("u:r:untrusted_app:s0",
+                "u:object_r:dex2oat_exec:s0", "file", "execute")
+                || SELinux.checkSELinuxAccess("u:r:untrusted_app:s0",
+                "u:object_r:dex2oat_exec:s0", "file", "execute_no_trans");
+                
+        if (hasAccess) {
+            if (compatibility == DEX2OAT_OK) doMount(false);
+            compatibility = DEX2OAT_SEPOLICY_INCORRECT;
+        } else if (compatibility != DEX2OAT_OK) {
+            checkAndRemount();
+        }
+    }
+
+    private void checkAndRemount() {
+        doMount(true);
+        if (notMounted()) {
+            doMount(false);
+            compatibility = DEX2OAT_MOUNT_FAILED;
+            selinuxObserver.stopWatching();
+        } else {
+            compatibility = DEX2OAT_OK;
+        }
     }
 
     private boolean notMounted() {
         for (int i = 0; i < dex2oatArray.length; i++) {
             var bin = dex2oatArray[i];
             if (bin == null) continue;
-            try {
-                var apex = Os.stat("/proc/1/root" + bin);
-                var wrapper = Os.stat(i < 2 ? WRAPPER32 : WRAPPER64);
-                if (apex.st_dev != wrapper.st_dev || apex.st_ino != wrapper.st_ino) {
-                    Log.w(TAG, "Check mount failed for " + bin);
-                    return true;
-                }
-            } catch (ErrnoException e) {
-                Log.e(TAG, "Check mount failed for " + bin, e);
+            
+            if (!checkMount(bin, i < 2 ? WRAPPER32 : WRAPPER64)) {
                 return true;
             }
         }
-        Log.d(TAG, "Check mount succeeded");
         return false;
+    }
+
+    private boolean checkMount(String binPath, String wrapperPath) {
+        try {
+            var apex = Os.stat("/proc/1/root" + binPath);
+            var wrapper = Os.stat(wrapperPath);
+            
+            if (apex.st_dev != wrapper.st_dev || apex.st_ino != wrapper.st_ino) {
+                return false;
+            }
+            return true;
+        } catch (ErrnoException e) {
+            Log.e(TAG, "Check mount failed for " + binPath, e);
+            return false;
+        }
     }
 
     private void doMount(boolean enabled) {
@@ -150,7 +185,7 @@ public class Dex2OatService implements Runnable {
     }
 
     public void start() {
-        if (notMounted()) { // Already mounted when restart daemon
+        if (notMounted()) {
             doMount(true);
             if (notMounted()) {
                 doMount(false);
@@ -159,20 +194,32 @@ public class Dex2OatService implements Runnable {
             }
         }
 
-        var thread = new Thread(this);
-        thread.setName("dex2oat");
-        thread.start();
+        serviceThread = new Thread(this, "dex2oat-wrapper");
+        serviceThread.setDaemon(true);
+        serviceThread.start();
+        
         selinuxObserver.startWatching();
-        selinuxObserver.onEvent(0, null);
+        checkSelinuxStatus();
     }
 
     @Override
     public void run() {
-        Log.i(TAG, "Dex2oat wrapper daemon start");
         var sockPath = getSockPath();
-        Log.d(TAG, "wrapper path: " + sockPath);
+        
+        setSelinuxContexts();
+        
+        try (var server = new LocalServerSocket(sockPath)) {
+            setSockCreateContext(null);
+            serveClients(server);
+        } catch (IOException e) {
+            handleServiceCrash(e);
+        }
+    }
+
+    private void setSelinuxContexts() {
         var magisk_file = "u:object_r:magisk_file:s0";
         var dex2oat_exec = "u:object_r:dex2oat_exec:s0";
+        
         if (SELinux.checkSELinuxAccess("u:r:dex2oat:s0", dex2oat_exec,
                 "file", "execute_no_trans")) {
             SELinux.setFileContext(WRAPPER32, dex2oat_exec);
@@ -183,31 +230,71 @@ public class Dex2OatService implements Runnable {
             SELinux.setFileContext(WRAPPER64, magisk_file);
             setSockCreateContext("u:r:installd:s0");
         }
-        try (var server = new LocalServerSocket(sockPath)) {
-            setSockCreateContext(null);
-            while (true) {
-                try (var client = server.accept();
-                     var is = client.getInputStream();
-                     var os = client.getOutputStream()) {
-                    var id = is.read();
-                    var fd = new FileDescriptor[]{fdArray[id]};
-                    client.setFileDescriptorsForSend(fd);
-                    os.write(1);
-                    Log.d(TAG, "Sent stock fd: is64 = " + ((id & 0b10) != 0) +
-                            ", isDebug = " + ((id & 0b01) != 0));
+    }
+
+    private void serveClients(LocalServerSocket server) {
+        while (!Thread.currentThread().isInterrupted()) {
+            try (var client = server.accept();
+                 var is = client.getInputStream();
+                 var os = client.getOutputStream()) {
+                handleClient(client, is, os);
+            } catch (IOException e) {
+                if (!Thread.currentThread().isInterrupted()) {
+                    Log.e(TAG, "Client handling error", e);
                 }
+                break;
             }
-        } catch (IOException e) {
-            Log.e(TAG, "Dex2oat wrapper daemon crashed", e);
-            if (compatibility == DEX2OAT_OK) {
-                doMount(false);
-                compatibility = DEX2OAT_CRASHED;
-            }
+        }
+    }
+
+    private void handleClient(LocalSocket client, InputStream is, OutputStream os) throws IOException {
+        var id = is.read();
+        if (id < 0 || id >= fdArray.length || fdArray[id] == null) {
+            return;
+        }
+        
+        var fd = new FileDescriptor[]{fdArray[id]};
+        client.setFileDescriptorsForSend(fd);
+        os.write(1);
+    }
+
+    private void handleServiceCrash(IOException e) {
+        Log.e(TAG, "Dex2oat wrapper daemon crashed", e);
+        if (compatibility == DEX2OAT_OK) {
+            doMount(false);
+            compatibility = DEX2OAT_CRASHED;
         }
     }
 
     public int getCompatibility() {
         return compatibility;
+    }
+
+    @Override
+    public void close() {
+        if (serviceThread != null && serviceThread.isAlive()) {
+            serviceThread.interrupt();
+            try {
+                serviceThread.join(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        
+        if (selinuxObserver != null) {
+            selinuxObserver.stopWatching();
+        }
+        
+        for (int i = 0; i < fdArray.length; i++) {
+            if (fdArray[i] != null && fdArray[i].valid()) {
+                try {
+                    Os.close(fdArray[i]);
+                    fdArray[i] = null;
+                } catch (ErrnoException e) {
+                    Log.e(TAG, "Failed to close FD at index " + i, e);
+                }
+            }
+        }
     }
 
     private native void doMountNative(boolean enabled,
