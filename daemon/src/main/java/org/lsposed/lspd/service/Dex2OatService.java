@@ -59,6 +59,7 @@ public class Dex2OatService implements Runnable, AutoCloseable {
     private final FileObserver selinuxObserver;
     private int compatibility = DEX2OAT_OK;
     private Thread serviceThread;
+    private boolean hasDebugVersions = false;
 
     public Dex2OatService() {
         initDex2oatPaths();
@@ -69,12 +70,13 @@ public class Dex2OatService implements Runnable, AutoCloseable {
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
             boolean is64Bit = Process.is64Bit();
             openDex2oat(is64Bit ? 2 : 0, "/apex/com.android.runtime/bin/dex2oat");
-            openDex2oat(is64Bit ? 3 : 1, "/apex/com.android.runtime/bin/dex2oatd");
+            tryOpenDex2oat(is64Bit ? 3 : 1, "/apex/com.android.runtime/bin/dex2oatd");
         } else {
             openDex2oat(0, "/apex/com.android.art/bin/dex2oat32");
-            openDex2oat(1, "/apex/com.android.art/bin/dex2oatd32");
             openDex2oat(2, "/apex/com.android.art/bin/dex2oat64");
-            openDex2oat(3, "/apex/com.android.art/bin/dex2oatd64");
+            
+            tryOpenDex2oat(1, "/apex/com.android.art/bin/dex2oatd32");
+            tryOpenDex2oat(3, "/apex/com.android.art/bin/dex2oatd64");
         }
     }
 
@@ -103,8 +105,22 @@ public class Dex2OatService implements Runnable, AutoCloseable {
             var fd = Os.open(path, OsConstants.O_RDONLY, 0);
             dex2oatArray[id] = path;
             fdArray[id] = fd;
+            Log.i(TAG, "Successfully opened " + path);
         } catch (ErrnoException e) {
             Log.e(TAG, "Failed to open " + path, e);
+            throw new RuntimeException("Required dex2oat binary not found: " + path, e);
+        }
+    }
+
+    private void tryOpenDex2oat(int id, String path) {
+        try {
+            var fd = Os.open(path, OsConstants.O_RDONLY, 0);
+            dex2oatArray[id] = path;
+            fdArray[id] = fd;
+            hasDebugVersions = true;
+            Log.i(TAG, "Successfully opened debug version: " + path);
+        } catch (ErrnoException e) {
+            Log.w(TAG, "Debug version not available: " + path);
         }
     }
 
@@ -154,6 +170,7 @@ public class Dex2OatService implements Runnable, AutoCloseable {
     }
 
     private boolean notMounted() {
+        boolean anyMounted = false;
         for (int i = 0; i < dex2oatArray.length; i++) {
             var bin = dex2oatArray[i];
             if (bin == null) continue;
@@ -161,8 +178,10 @@ public class Dex2OatService implements Runnable, AutoCloseable {
             if (!checkMount(bin, i < 2 ? WRAPPER32 : WRAPPER64)) {
                 return true;
             }
+            anyMounted = true;
         }
-        return false;
+        
+        return !anyMounted;
     }
 
     private boolean checkMount(String binPath, String wrapperPath) {
@@ -175,7 +194,7 @@ public class Dex2OatService implements Runnable, AutoCloseable {
             }
             return true;
         } catch (ErrnoException e) {
-            Log.e(TAG, "Check mount failed for " + binPath, e);
+            Log.w(TAG, "Check mount failed for " + binPath + ": " + e.getMessage());
             return false;
         }
     }
@@ -185,6 +204,20 @@ public class Dex2OatService implements Runnable, AutoCloseable {
     }
 
     public void start() {
+        boolean hasValidBinaries = false;
+        for (String path : dex2oatArray) {
+            if (path != null) {
+                hasValidBinaries = true;
+                break;
+            }
+        }
+        
+        if (!hasValidBinaries) {
+            Log.e(TAG, "No valid dex2oat binaries found");
+            compatibility = DEX2OAT_MOUNT_FAILED;
+            return;
+        }
+
         if (notMounted()) {
             doMount(true);
             if (notMounted()) {
@@ -250,7 +283,16 @@ public class Dex2OatService implements Runnable, AutoCloseable {
     private void handleClient(LocalSocket client, InputStream is, OutputStream os) throws IOException {
         var id = is.read();
         if (id < 0 || id >= fdArray.length || fdArray[id] == null) {
-            return;
+            if (id == 1 || id == 3) {
+                int fallbackId = id - 1;
+                if (fallbackId >= 0 && fallbackId < fdArray.length && fdArray[fallbackId] != null) {
+                    id = fallbackId;
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
         }
         
         var fd = new FileDescriptor[]{fdArray[id]};
