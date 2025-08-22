@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "logging.h"
 
@@ -42,7 +43,11 @@
 const char kSockName[] = "5291374ceda0aef7c5d86cd2a4f6a3ac\0";
 
 static ssize_t xrecvmsg(int sockfd, struct msghdr *msg, int flags) {
-    int rec = recvmsg(sockfd, msg, flags);
+    ssize_t rec;
+    do {
+        rec = recvmsg(sockfd, msg, flags);
+    } while (rec < 0 && errno == EINTR);
+    
     if (rec < 0) {
         PLOGE("recvmsg");
     }
@@ -64,7 +69,7 @@ static void *recv_fds(int sockfd, char *cmsgbuf, size_t bufsz, int cnt) {
     xrecvmsg(sockfd, &msg, MSG_WAITALL);
     struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
 
-    if (msg.msg_controllen != bufsz ||
+    if (msg.msg_controllen < CMSG_SPACE(sizeof(int) * cnt) ||
         cmsg == NULL ||
         cmsg->cmsg_len != CMSG_LEN(sizeof(int) * cnt) ||
         cmsg->cmsg_level != SOL_SOCKET ||
@@ -89,31 +94,82 @@ static int recv_fd(int sockfd) {
 
 static int read_int(int fd) {
     int val;
-    if (read(fd, &val, sizeof(val)) != sizeof(val))
+    ssize_t bytes_read;
+    do {
+        bytes_read = read(fd, &val, sizeof(val));
+    } while (bytes_read < 0 && errno == EINTR);
+    
+    if (bytes_read != sizeof(val))
         return -1;
     return val;
 }
 
 static void write_int(int fd, int val) {
     if (fd < 0) return;
-    write(fd, &val, sizeof(val));
+    
+    ssize_t bytes_written;
+    do {
+        bytes_written = write(fd, &val, sizeof(val));
+    } while (bytes_written < 0 && errno == EINTR);
+}
+
+static int set_cloexec(int fd) {
+    int flags = fcntl(fd, F_GETFD);
+    if (flags == -1) {
+        return -1;
+    }
+    
+    if (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        return -1;
+    }
+    
+    return 0;
 }
 
 int main(int argc, char **argv) {
     LOGD("dex2oat wrapper ppid=%d", getppid());
+    
+    int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock_fd < 0) {
+        PLOGE("socket");
+        return 1;
+    }
+    
+    // Set CLOEXEC on socket to avoid leaking it to dex2oat
+    if (set_cloexec(sock_fd) < 0) {
+        PLOGE("fcntl");
+        close(sock_fd);
+        return 1;
+    }
+    
     struct sockaddr_un sock = {};
     sock.sun_family = AF_UNIX;
     strlcpy(sock.sun_path + 1, kSockName, sizeof(sock.sun_path) - 1);
-    int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    
     size_t len = sizeof(sa_family_t) + strlen(sock.sun_path + 1) + 1;
     if (connect(sock_fd, (struct sockaddr *) &sock, len)) {
         PLOGE("failed to connect to %s", sock.sun_path + 1);
+        close(sock_fd);
         return 1;
     }
+    
     write_int(sock_fd, ID_VEC(LP_SELECT(0, 1), strstr(argv[0], "dex2oatd") != NULL));
     int stock_fd = recv_fd(sock_fd);
     read_int(sock_fd);
     close(sock_fd);
+    
+    if (stock_fd < 0) {
+        LOGE("Failed to receive file descriptor");
+        return 1;
+    }
+    
+    // Set CLOEXEC on stock_fd to avoid leaking it if exec fails
+    if (set_cloexec(stock_fd) < 0) {
+        PLOGE("fcntl");
+        close(stock_fd);
+        return 1;
+    }
+    
     LOGD("sock: %s %d", sock.sun_path + 1, stock_fd);
 
     const char *new_argv[argc + 2];
@@ -130,5 +186,6 @@ int main(int argc, char **argv) {
 
     fexecve(stock_fd, (char **) new_argv, environ);
     PLOGE("fexecve failed");
+    close(stock_fd);
     return 2;
 }
