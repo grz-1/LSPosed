@@ -17,10 +17,6 @@
  * Copyright (C) 2022 LSPosed Contributors
  */
 
-//
-// Created by Nullptr on 2022/4/1.
-//
-
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -40,7 +36,14 @@
 
 #define ID_VEC(is64, is_debug) (((is64) << 1) | (is_debug))
 
-const char kSockName[] = "5291374ceda0aef7c5d86cd2a4f6a3ac\0";
+const char kSockName[] = "5291374ceda0aef7c5d86cd2a4f6a3ac";
+
+static const int kIs64Bit = LP_SELECT(0, 1);
+
+static int is_debug_version(const char *arg0) {
+    size_t len = strlen(arg0);
+    return (len > 0 && arg0[len - 1] == 'd') ? 1 : 0;
+}
 
 static ssize_t xrecvmsg(int sockfd, struct msghdr *msg, int flags) {
     ssize_t rec;
@@ -127,7 +130,9 @@ static int set_cloexec(int fd) {
 }
 
 int main(int argc, char **argv) {
+#ifndef NDEBUG
     LOGD("dex2oat wrapper ppid=%d", getppid());
+#endif
     
     int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock_fd < 0) {
@@ -135,7 +140,6 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    // Set CLOEXEC on socket to avoid leaking it to dex2oat
     if (set_cloexec(sock_fd) < 0) {
         PLOGE("fcntl");
         close(sock_fd);
@@ -153,7 +157,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    write_int(sock_fd, ID_VEC(LP_SELECT(0, 1), strstr(argv[0], "dex2oatd") != NULL));
+    write_int(sock_fd, ID_VEC(kIs64Bit, is_debug_version(argv[0])));
     int stock_fd = recv_fd(sock_fd);
     read_int(sock_fd);
     close(sock_fd);
@@ -163,28 +167,29 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    // Set CLOEXEC on stock_fd to avoid leaking it if exec fails
     if (set_cloexec(stock_fd) < 0) {
         PLOGE("fcntl");
         close(stock_fd);
         return 1;
     }
     
+#ifndef NDEBUG
     LOGD("sock: %s %d", sock.sun_path + 1, stock_fd);
+#endif
 
-    const char *new_argv[argc + 2];
-    for (int i = 0; i < argc; i++) new_argv[i] = argv[i];
+    char **new_argv = alloca((argc + 2) * sizeof(char *));
+    memcpy(new_argv, argv, argc * sizeof(char *));
     new_argv[argc] = "--inline-max-code-units=0";
     new_argv[argc + 1] = NULL;
 
     if (getenv("LD_LIBRARY_PATH") == NULL) {
-        char const *libenv =
-                "LD_LIBRARY_PATH=/apex/com.android.art/lib64:/apex/com.android.art/lib"
-                ":/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib";
+        static const char libenv[] = 
+            "LD_LIBRARY_PATH=/apex/com.android.art/lib64:/apex/com.android.art/lib"
+            ":/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib";
         putenv((char *)libenv);
     }
 
-    fexecve(stock_fd, (char **) new_argv, environ);
+    fexecve(stock_fd, new_argv, environ);
     PLOGE("fexecve failed");
     close(stock_fd);
     return 2;
