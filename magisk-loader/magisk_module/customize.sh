@@ -119,7 +119,13 @@ if [ -n "$ABI32" ]; then
 fi
 
 ui_print "- Extracting dex2oat binary"
-extract "bin/$PRIMARY_ABI/dex2oat" "bin"
+if [ -n "$ABI64" ]; then
+  extract "bin/$ABI64/dex2oat" "bin" "dex2oat64"
+fi
+
+if [ -n "$ABI32" ]; then
+  extract "bin/$ABI32/dex2oat" "bin" "dex2oat32"
+fi
 
 set_perm_recursive "$MODPATH" 0 0 0755 0644
 set_perm_recursive "$MODPATH/bin" 0 2000 0755 0755
