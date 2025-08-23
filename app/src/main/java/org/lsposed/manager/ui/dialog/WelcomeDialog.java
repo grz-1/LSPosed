@@ -37,7 +37,7 @@ public class WelcomeDialog extends DialogFragment {
     private Dialog parasiticDialog(BlurBehindDialogBuilder builder) {
         builder
                 .setTitle(R.string.parasitic_welcome)
-                .setMessage(R.string.app_welcome_summary)
+                .setMessage(R.string.parasitic_welcome_summary)
                 .setNegativeButton(R.string.never_show, (dialog, which) ->
                         App.getPreferences().edit().putBoolean("never_show_welcome", true).apply())
                 .setPositiveButton(android.R.string.ok, null);
