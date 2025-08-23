@@ -30,7 +30,7 @@ import java.time.format.DateTimeFormatter;
 
 import org.lsposed.manager.R;
 
-public class NewFake extends BaseFragment {
+public class NewFake extends PreferenceFragmentCompat {
     @Override
     public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
         setPreferencesFromResource(R.xml.prefs, rootKey);
@@ -51,6 +51,9 @@ public class NewFake extends BaseFragment {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
         String timestamp = now.format(formatter);
         String fileName = "/data/adb/lspd/log/dump_hook_debug_" + timestamp + ".log";
-        showHint(getString(R.string.settings_fake_dumped, fileName), true);
+        Fragment parent = getParentFragment();
+        if (parent instanceof BaseFragment) {
+            ((BaseFragment) parent).showHint(getString(R.string.settings_fake_dumped, fileName), true);
+        }
     }
 }
