@@ -175,9 +175,14 @@ public class Dex2OatService implements Runnable, AutoCloseable {
             if (bin == null) continue;
             
             if (!checkMount(bin)) {
+                Log.w(TAG, "Binary not mounted: " + bin);
                 return true;
             }
             anyMounted = true;
+        }
+        
+        if (!anyMounted) {
+            Log.w(TAG, "No binaries available for mounting");
         }
         
         return !anyMounted;
@@ -186,12 +191,16 @@ public class Dex2OatService implements Runnable, AutoCloseable {
     private boolean checkMount(String binPath) {
         try {
             var apex = Os.stat(binPath);
+            
             var wrapper = Os.stat(WRAPPER);
             
             if (apex.st_dev != wrapper.st_dev || apex.st_ino != wrapper.st_ino) {
                 Log.w(TAG, "Mount check failed: " + binPath + " is not mounted to " + WRAPPER);
+                Log.w(TAG, "Apex dev: " + apex.st_dev + ", ino: " + apex.st_ino);
+                Log.w(TAG, "Wrapper dev: " + wrapper.st_dev + ", ino: " + wrapper.st_ino);
                 return false;
             }
+            
             Log.i(TAG, "Mount check passed: " + binPath + " is mounted to " + WRAPPER);
             return true;
         } catch (ErrnoException e) {
@@ -201,7 +210,14 @@ public class Dex2OatService implements Runnable, AutoCloseable {
     }
 
     private void doMount(boolean enabled) {
+        Log.i(TAG, "Performing mount operation, enabled: " + enabled);
         doMountNative(enabled, dex2oatArray[0], dex2oatArray[1], dex2oatArray[2], dex2oatArray[3]);
+        
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public void start() {
@@ -224,15 +240,17 @@ public class Dex2OatService implements Runnable, AutoCloseable {
             compatibility = DEX2OAT_MOUNT_FAILED;
             return;
         }
-
+        doMount(false);
+        doMount(true);
         if (notMounted()) {
-            doMount(true);
-            if (notMounted()) {
-                doMount(false);
-                compatibility = DEX2OAT_MOUNT_FAILED;
-                return;
-            }
+            Log.e(TAG, "Mount failed after attempt");
+            doMount(false);
+            compatibility = DEX2OAT_MOUNT_FAILED;
+            return;
         }
+
+        Log.i(TAG, "Mount successful, starting service");
+        compatibility = DEX2OAT_OK;
 
         serviceThread = new Thread(this, "dex2oat-wrapper");
         serviceThread.setDaemon(true);
@@ -245,6 +263,7 @@ public class Dex2OatService implements Runnable, AutoCloseable {
     private boolean checkWrapperFile() {
         try {
             Os.stat(WRAPPER);
+            Log.i(TAG, "Wrapper file exists: " + WRAPPER);
             return true;
         } catch (ErrnoException e) {
             Log.e(TAG, "Wrapper file not found: " + WRAPPER);
@@ -255,11 +274,13 @@ public class Dex2OatService implements Runnable, AutoCloseable {
     @Override
     public void run() {
         var sockPath = getSockPath();
+        Log.i(TAG, "Starting dex2oat wrapper service on socket: " + sockPath);
         
         setSelinuxContexts();
         
         try (var server = new LocalServerSocket(sockPath)) {
             setSockCreateContext(null);
+            Log.i(TAG, "Server socket created, waiting for connections");
             serveClients(server);
         } catch (IOException e) {
             handleServiceCrash(e);
@@ -270,13 +291,19 @@ public class Dex2OatService implements Runnable, AutoCloseable {
         var magisk_file = "u:object_r:magisk_file:s0";
         var dex2oat_exec = "u:object_r:dex2oat_exec:s0";
         
-        if (SELinux.checkSELinuxAccess("u:r:dex2oat:s0", dex2oat_exec,
-                "file", "execute_no_trans")) {
-            SELinux.setFileContext(WRAPPER, dex2oat_exec);
-            setSockCreateContext("u:r:dex2oat:s0");
-        } else {
-            SELinux.setFileContext(WRAPPER, magisk_file);
-            setSockCreateContext("u:r:installd:s0");
+        try {
+            if (SELinux.checkSELinuxAccess("u:r:dex2oat:s0", dex2oat_exec,
+                    "file", "execute_no_trans")) {
+                SELinux.setFileContext(WRAPPER, dex2oat_exec);
+                setSockCreateContext("u:r:dex2oat:s0");
+                Log.i(TAG, "Set SELinux context to dex2oat_exec");
+            } else {
+                SELinux.setFileContext(WRAPPER, magisk_file);
+                setSockCreateContext("u:r:installd:s0");
+                Log.i(TAG, "Set SELinux context to magisk_file");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to set SELinux context", e);
         }
     }
 
@@ -285,6 +312,7 @@ public class Dex2OatService implements Runnable, AutoCloseable {
             try (var client = server.accept();
                  var is = client.getInputStream();
                  var os = client.getOutputStream()) {
+                Log.i(TAG, "Client connected");
                 handleClient(client, is, os);
             } catch (IOException e) {
                 if (!Thread.currentThread().isInterrupted()) {
@@ -297,15 +325,21 @@ public class Dex2OatService implements Runnable, AutoCloseable {
 
     private void handleClient(LocalSocket client, InputStream is, OutputStream os) throws IOException {
         var id = is.read();
+        Log.i(TAG, "Client request for ID: " + id);
+        
         if (id < 0 || id >= fdArray.length || fdArray[id] == null) {
+            Log.w(TAG, "Invalid client request for ID: " + id);
             if (id == 1 || id == 3) {
                 int fallbackId = id - 1;
                 if (fallbackId >= 0 && fallbackId < fdArray.length && fdArray[fallbackId] != null) {
                     id = fallbackId;
+                    Log.i(TAG, "Falling back to ID: " + id);
                 } else {
+                    Log.w(TAG, "No fallback available for ID: " + id);
                     return;
                 }
             } else {
+                Log.w(TAG, "No valid binary for ID: " + id);
                 return;
             }
         }
@@ -313,6 +347,7 @@ public class Dex2OatService implements Runnable, AutoCloseable {
         var fd = new FileDescriptor[]{fdArray[id]};
         client.setFileDescriptorsForSend(fd);
         os.write(1);
+        Log.i(TAG, "Sent file descriptor for ID: " + id);
     }
 
     private void handleServiceCrash(IOException e) {
@@ -329,6 +364,8 @@ public class Dex2OatService implements Runnable, AutoCloseable {
 
     @Override
     public void close() {
+        Log.i(TAG, "Closing Dex2OatService");
+        
         if (serviceThread != null && serviceThread.isAlive()) {
             serviceThread.interrupt();
             try {
@@ -352,6 +389,7 @@ public class Dex2OatService implements Runnable, AutoCloseable {
                 }
             }
         }
+        doMount(false);
     }
 
     private native void doMountNative(boolean enabled,
