@@ -51,8 +51,8 @@ import java.util.ArrayList;
 @RequiresApi(Build.VERSION_CODES.Q)
 public class Dex2OatService implements Runnable, AutoCloseable {
     private static final String TAG = "LSPosedDex2Oat";
-    private static final String WRAPPER32 = "bin/dex2oat32";
-    private static final String WRAPPER64 = "bin/dex2oat64";
+    private static final String MODULE_PATH = "/data/adb/modules/zygisk_lsposed/";
+    private static final String WRAPPER = MODULE_PATH + "bin/dex2oat";
 
     private final String[] dex2oatArray = new String[4];
     private final FileDescriptor[] fdArray = new FileDescriptor[4];
@@ -74,7 +74,6 @@ public class Dex2OatService implements Runnable, AutoCloseable {
         } else {
             openDex2oat(0, "/apex/com.android.art/bin/dex2oat32");
             openDex2oat(2, "/apex/com.android.art/bin/dex2oat64");
-            
             tryOpenDex2oat(1, "/apex/com.android.art/bin/dex2oatd32");
             tryOpenDex2oat(3, "/apex/com.android.art/bin/dex2oatd64");
         }
@@ -175,7 +174,7 @@ public class Dex2OatService implements Runnable, AutoCloseable {
             var bin = dex2oatArray[i];
             if (bin == null) continue;
             
-            if (!checkMount(bin, i < 2 ? WRAPPER32 : WRAPPER64)) {
+            if (!checkMount(bin)) {
                 return true;
             }
             anyMounted = true;
@@ -184,17 +183,19 @@ public class Dex2OatService implements Runnable, AutoCloseable {
         return !anyMounted;
     }
 
-    private boolean checkMount(String binPath, String wrapperPath) {
+    private boolean checkMount(String binPath) {
         try {
-            var apex = Os.stat("/proc/1/root" + binPath);
-            var wrapper = Os.stat(wrapperPath);
+            var apex = Os.stat(binPath);
+            var wrapper = Os.stat(WRAPPER);
             
             if (apex.st_dev != wrapper.st_dev || apex.st_ino != wrapper.st_ino) {
+                Log.w(TAG, "Mount check failed: " + binPath + " is not mounted to " + WRAPPER);
                 return false;
             }
+            Log.i(TAG, "Mount check passed: " + binPath + " is mounted to " + WRAPPER);
             return true;
         } catch (ErrnoException e) {
-            Log.w(TAG, "Check mount failed for " + binPath + ": " + e.getMessage());
+            Log.w(TAG, "Mount check failed for " + binPath + ": " + e.getMessage());
             return false;
         }
     }
@@ -218,6 +219,12 @@ public class Dex2OatService implements Runnable, AutoCloseable {
             return;
         }
 
+        if (!checkWrapperFile()) {
+            Log.e(TAG, "Wrapper file not found: " + WRAPPER);
+            compatibility = DEX2OAT_MOUNT_FAILED;
+            return;
+        }
+
         if (notMounted()) {
             doMount(true);
             if (notMounted()) {
@@ -233,6 +240,16 @@ public class Dex2OatService implements Runnable, AutoCloseable {
         
         selinuxObserver.startWatching();
         checkSelinuxStatus();
+    }
+
+    private boolean checkWrapperFile() {
+        try {
+            Os.stat(WRAPPER);
+            return true;
+        } catch (ErrnoException e) {
+            Log.e(TAG, "Wrapper file not found: " + WRAPPER);
+            return false;
+        }
     }
 
     @Override
@@ -255,12 +272,10 @@ public class Dex2OatService implements Runnable, AutoCloseable {
         
         if (SELinux.checkSELinuxAccess("u:r:dex2oat:s0", dex2oat_exec,
                 "file", "execute_no_trans")) {
-            SELinux.setFileContext(WRAPPER32, dex2oat_exec);
-            SELinux.setFileContext(WRAPPER64, dex2oat_exec);
+            SELinux.setFileContext(WRAPPER, dex2oat_exec);
             setSockCreateContext("u:r:dex2oat:s0");
         } else {
-            SELinux.setFileContext(WRAPPER32, magisk_file);
-            SELinux.setFileContext(WRAPPER64, magisk_file);
+            SELinux.setFileContext(WRAPPER, magisk_file);
             setSockCreateContext("u:r:installd:s0");
         }
     }
