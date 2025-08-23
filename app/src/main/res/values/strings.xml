@@ -201,6 +201,7 @@
     <string name="settings_fake_hook_debug_summary">Allow dumping of hook debugging information of hooked process, which may have a performance impact</string>
     <string name="settings_fake_dump_hook_debug_info">Dump hook debug info</string>
     <string name="settings_fake_dump_hook_debug_info_summary">Dump hook debug info to /data/adb/lspd/log</string>
+    <string name="settings_fake_dumped">Dumped to %s</string>
 
     <!-- Module Repo -->
     <string name="module_readme">Readme</string>
