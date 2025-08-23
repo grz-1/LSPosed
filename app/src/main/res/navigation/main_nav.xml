@@ -34,6 +34,11 @@
         android:name="org.lsposed.manager.ui.fragment.SettingsFragment"
         android:label="settings" />
 
+    <fragment
+        android:id="@+id/new_fake_fragment"
+        android:name="org.lsposed.manager.ui.fragment.NewFake"
+        android:label="new_fake" />
+
     <include app:graph="@navigation/modules_nav" />
     <include app:graph="@navigation/repo_nav" />
 </navigation>
