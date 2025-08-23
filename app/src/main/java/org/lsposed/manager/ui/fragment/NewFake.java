@@ -22,12 +22,13 @@ package org.lsposed.manager.ui.fragment;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
-
-import org.lsposed.manager.R;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+
+import org.lsposed.manager.R;
 
 public class NewFake extends PreferenceFragmentCompat {
 
@@ -53,6 +54,9 @@ public class NewFake extends PreferenceFragmentCompat {
 
         String fileName = "/data/adb/lspd/log/dump_hook_debug_" + timestamp + ".log";
 
-        ((NewFake) getParentFragment()).showHint(R.string.settings_fake_dumped, true, fileName);
+        Fragment parent = getParentFragment();
+        if (parent instanceof BaseFragment) {
+            ((BaseFragment) parent).showHint(getString(R.string.settings_fake_dumped, fileName), true);
+        }
     }
 }
