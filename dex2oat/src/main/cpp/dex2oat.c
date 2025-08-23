@@ -51,9 +51,6 @@ static ssize_t xrecvmsg(int sockfd, struct msghdr *msg, int flags) {
         rec = recvmsg(sockfd, msg, flags);
     } while (rec < 0 && errno == EINTR);
     
-    if (rec < 0) {
-        PLOGE("recvmsg");
-    }
     return rec;
 }
 
@@ -69,7 +66,10 @@ static void *recv_fds(int sockfd, char *cmsgbuf, size_t bufsz, int cnt) {
             .msg_controllen = bufsz
     };
 
-    xrecvmsg(sockfd, &msg, MSG_WAITALL);
+    if (xrecvmsg(sockfd, &msg, MSG_WAITALL) < 0) {
+        return NULL;
+    }
+
     struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
 
     if (msg.msg_controllen < CMSG_SPACE(sizeof(int) * cnt) ||
@@ -102,18 +102,24 @@ static int read_int(int fd) {
         bytes_read = read(fd, &val, sizeof(val));
     } while (bytes_read < 0 && errno == EINTR);
     
-    if (bytes_read != sizeof(val))
+    if (bytes_read != sizeof(val)) {
         return -1;
+    }
     return val;
 }
 
-static void write_int(int fd, int val) {
-    if (fd < 0) return;
+static int write_int(int fd, int val) {
+    if (fd < 0) return -1;
     
     ssize_t bytes_written;
     do {
         bytes_written = write(fd, &val, sizeof(val));
     } while (bytes_written < 0 && errno == EINTR);
+
+    if (bytes_written != sizeof(val)) {
+        return -1;
+    }
+    return 0;
 }
 
 static int set_cloexec(int fd) {
@@ -129,55 +135,73 @@ static int set_cloexec(int fd) {
     return 0;
 }
 
-int main(int argc, char **argv) {
-#ifndef NDEBUG
-    LOGD("dex2oat wrapper ppid=%d", getppid());
-#endif
-    
-    int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (sock_fd < 0) {
+static int connect_to_server(const char* sock_name, int* sock_fd) {
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) {
         PLOGE("socket");
-        return 1;
+        return -1;
     }
     
-    if (set_cloexec(sock_fd) < 0) {
-        PLOGE("fcntl");
-        close(sock_fd);
-        return 1;
+    if (set_cloexec(fd) < 0) {
+        close(fd);
+        return -1;
     }
     
     struct sockaddr_un sock = {};
     sock.sun_family = AF_UNIX;
-    strlcpy(sock.sun_path + 1, kSockName, sizeof(sock.sun_path) - 1);
     
-    size_t len = sizeof(sa_family_t) + strlen(sock.sun_path + 1) + 1;
-    if (connect(sock_fd, (struct sockaddr *) &sock, len)) {
-        PLOGE("failed to connect to %s", sock.sun_path + 1);
-        close(sock_fd);
-        return 1;
+    size_t i;
+    for (i = 0; i < sizeof(sock.sun_path) - 2 && sock_name[i] != '\0'; i++) {
+        sock.sun_path[1 + i] = sock_name[i];
     }
+    sock.sun_path[1 + i] = '\0';
     
-    write_int(sock_fd, ID_VEC(kIs64Bit, is_debug_version(argv[0])));
-    int stock_fd = recv_fd(sock_fd);
-    read_int(sock_fd);
-    close(sock_fd);
-    
-    if (stock_fd < 0) {
-        LOGE("Failed to receive file descriptor");
-        return 1;
+    size_t len = sizeof(sa_family_t) + i + 1;
+    if (connect(fd, (struct sockaddr *) &sock, len)) {
+        close(fd);
+        return -1;
     }
-    
-    if (set_cloexec(stock_fd) < 0) {
-        PLOGE("fcntl");
-        close(stock_fd);
-        return 1;
-    }
-    
-#ifndef NDEBUG
-    LOGD("sock: %s %d", sock.sun_path + 1, stock_fd);
-#endif
 
-    char **new_argv = alloca((argc + 2) * sizeof(char *));
+    *sock_fd = fd;
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    int sock_fd = -1;
+    int stock_fd = -1;
+    int ret = 1;
+    char **new_argv = NULL;
+
+    if (connect_to_server(kSockName, &sock_fd) < 0) {
+        goto cleanup;
+    }
+
+    if (write_int(sock_fd, ID_VEC(kIs64Bit, is_debug_version(argv[0]))) < 0) {
+        goto cleanup;
+    }
+
+    stock_fd = recv_fd(sock_fd);
+    if (stock_fd < 0) {
+        goto cleanup;
+    }
+
+    if (read_int(sock_fd) < 0) {
+        goto cleanup;
+    }
+
+    if (set_cloexec(stock_fd) < 0) {
+        goto cleanup;
+    }
+
+    close(sock_fd);
+    sock_fd = -1;
+
+    new_argv = malloc((argc + 2) * sizeof(char *));
+    if (!new_argv) {
+        ret = 1;
+        goto cleanup;
+    }
+    
     memcpy(new_argv, argv, argc * sizeof(char *));
     new_argv[argc] = "--inline-max-code-units=0";
     new_argv[argc + 1] = NULL;
@@ -190,7 +214,11 @@ int main(int argc, char **argv) {
     }
 
     fexecve(stock_fd, new_argv, environ);
-    PLOGE("fexecve failed");
-    close(stock_fd);
-    return 2;
+    ret = 2;
+
+cleanup:
+    if (sock_fd >= 0) close(sock_fd);
+    if (stock_fd >= 0) close(stock_fd);
+    if (new_argv) free(new_argv);
+    return ret;
 }
