@@ -19,7 +19,11 @@
 
 package org.lsposed.lspd.service;
 
-import static org.lsposed.lspd.ILSPManagerService.*;
+import static org.lsposed.lspd.ILSPManagerService.DEX2OAT_CRASHED;
+import static org.lsposed.lspd.ILSPManagerService.DEX2OAT_MOUNT_FAILED;
+import static org.lsposed.lspd.ILSPManagerService.DEX2OAT_OK;
+import static org.lsposed.lspd.ILSPManagerService.DEX2OAT_SELINUX_PERMISSIVE;
+import static org.lsposed.lspd.ILSPManagerService.DEX2OAT_SEPOLICY_INCORRECT;
 
 import android.net.LocalServerSocket;
 import android.os.Build;
@@ -146,7 +150,7 @@ public class Dex2OatService implements Runnable {
     }
 
     public void start() {
-        if (notMounted()) {
+        if (notMounted()) { // Already mounted when restart daemon
             doMount(true);
             if (notMounted()) {
                 doMount(false);
@@ -179,7 +183,6 @@ public class Dex2OatService implements Runnable {
             SELinux.setFileContext(WRAPPER64, magisk_file);
             setSockCreateContext("u:r:installd:s0");
         }
-        
         try (var server = new LocalServerSocket(sockPath)) {
             setSockCreateContext(null);
             while (true) {
