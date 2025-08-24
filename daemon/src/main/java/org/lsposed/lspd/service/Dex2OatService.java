@@ -29,6 +29,7 @@ import android.os.SELinux;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.system.OsConstants;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -182,19 +183,20 @@ public class Dex2OatService implements Runnable {
         
         try (var server = new LocalServerSocket(sockPath)) {
             setSockCreateContext(null);
+            
             while (running) {
                 try (var client = server.accept();
                      var is = client.getInputStream();
                      var os = client.getOutputStream()) {
-                    
                     int id = is.read();
-                    if (id < 0 || id >= fdArray.length || fdArray[id] == null) {
-                        continue;
+                    if (id < 0) break;
+                    if (id >= 0 && id < fdArray.length && fdArray[id] != null) {
+                        os.write(1);
+                        var fd = new FileDescriptor[]{fdArray[id]};
+                        client.setFileDescriptorsForSend(fd);
+                    } else {
+                        os.write(0);
                     }
-                    
-                    var fd = new FileDescriptor[]{fdArray[id]};
-                    client.setFileDescriptorsForSend(fd);
-                    os.write(1);
                 } catch (IOException e) {
                     if (!running) break;
                 }
