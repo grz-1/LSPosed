@@ -54,7 +54,8 @@ static ssize_t xrecvmsg(int sockfd, struct msghdr *msg, int flags) {
 }
 
 static void *recv_fds(int sockfd, char *cmsgbuf, size_t bufsz, int cnt) {
-    struct iovec iov = { .iov_base = &cnt, .iov_len = sizeof(cnt) };
+    int ack;
+    struct iovec iov = { .iov_base = &ack, .iov_len = sizeof(ack) };
     struct msghdr msg = {
         .msg_iov = &iov,
         .msg_iovlen = 1,
@@ -62,7 +63,7 @@ static void *recv_fds(int sockfd, char *cmsgbuf, size_t bufsz, int cnt) {
         .msg_controllen = bufsz
     };
 
-    if (xrecvmsg(sockfd, &msg, MSG_WAITALL) != sizeof(cnt)) {
+    if (xrecvmsg(sockfd, &msg, MSG_WAITALL) != sizeof(ack) || ack != 1) {
         return NULL;
     }
 
@@ -115,7 +116,10 @@ static int set_cloexec(int fd) {
 
 static int connect_to_server(const char* sock_name, int* sock_fd) {
     int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
-    if (fd < 0) return -1;
+    if (fd < 0) {
+        PLOGE("socket");
+        return -1;
+    }
 
     struct sockaddr_un sock = { .sun_family = AF_UNIX };
     size_t i;
@@ -139,22 +143,31 @@ int main(int argc, char **argv) {
     int ret = 1;
     char **new_argv = NULL;
 
-    if (connect_to_server(kSockName, &sock_fd) < 0) goto cleanup;
+    if (connect_to_server(kSockName, &sock_fd) < 0) {
+        goto cleanup;
+    }
 
     int id_vec = ID_VEC(kIs64Bit, is_debug_version(argv[0]));
-    if (write_int(sock_fd, id_vec) < 0) goto cleanup;
+    if (write_int(sock_fd, id_vec) < 0) {
+        goto cleanup;
+    }
 
     stock_fd = recv_fd(sock_fd);
-    if (stock_fd < 0) goto cleanup;
+    if (stock_fd < 0) {
+        goto cleanup;
+    }
 
-    if (read_int(sock_fd) < 0) goto cleanup;
     close(sock_fd);
     sock_fd = -1;
 
-    if (set_cloexec(stock_fd) < 0) goto cleanup;
+    if (set_cloexec(stock_fd) < 0) {
+        goto cleanup;
+    }
 
     size_t new_argv_size = (argc + 2) * sizeof(char *);
-    if (!(new_argv = malloc(new_argv_size))) goto cleanup;
+    if (!(new_argv = malloc(new_argv_size))) {
+        goto cleanup;
+    }
     memcpy(new_argv, argv, argc * sizeof(char *));
     new_argv[argc] = "--inline-max-code-units=0";
     new_argv[argc + 1] = NULL;
