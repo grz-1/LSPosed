@@ -46,14 +46,11 @@ public class Dex2OatService implements Runnable {
     private static final String TAG = "LSPosedDex2Oat";
     private static final String WRAPPER32 = "bin/dex2oat32";
     private static final String WRAPPER64 = "bin/dex2oat64";
-    private static final int FLAG_IS_64_BIT = 0b10;
-    private static final int FLAG_IS_DEBUG = 0b01;
 
     private final String[] dex2oatArray = new String[4];
     private final FileDescriptor[] fdArray = new FileDescriptor[4];
     private final FileObserver selinuxObserver;
     private int compatibility = DEX2OAT_OK;
-    private volatile boolean running = true;
 
     private void openDex2oat(int id, String path) {
         try {
@@ -66,9 +63,8 @@ public class Dex2OatService implements Runnable {
 
     public Dex2OatService() {
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
-            boolean is64Bit = Process.is64Bit();
-            openDex2oat(is64Bit ? 2 : 0, "/apex/com.android.runtime/bin/dex2oat");
-            openDex2oat(is64Bit ? 3 : 1, "/apex/com.android.runtime/bin/dex2oatd");
+            openDex2oat(Process.is64Bit() ? 2 : 0, "/apex/com.android.runtime/bin/dex2oat");
+            openDex2oat(Process.is64Bit() ? 3 : 1, "/apex/com.android.runtime/bin/dex2oatd");
         } else {
             openDex2oat(0, "/apex/com.android.art/bin/dex2oat32");
             openDex2oat(1, "/apex/com.android.art/bin/dex2oatd32");
@@ -84,6 +80,7 @@ public class Dex2OatService implements Runnable {
         selinuxObserver = new FileObserver(list, FileObserver.CLOSE_WRITE) {
             @Override
             public synchronized void onEvent(int i, @Nullable String s) {
+                Log.d(TAG, "SELinux status changed");
                 if (compatibility == DEX2OAT_CRASHED) {
                     stopWatching();
                     return;
@@ -98,26 +95,28 @@ public class Dex2OatService implements Runnable {
                 if (!enforcing) {
                     if (compatibility == DEX2OAT_OK) doMount(false);
                     compatibility = DEX2OAT_SELINUX_PERMISSIVE;
-                } else {
-                    boolean hasAccess = SELinux.checkSELinuxAccess("u:r:untrusted_app:s0",
-                            "u:object_r:dex2oat_exec:s0", "file", "execute");
-                    hasAccess |= SELinux.checkSELinuxAccess("u:r:untrusted_app:s0",
-                            "u:object_r:dex2oat_exec:s0", "file", "execute_no_trans");
-                    
-                    if (hasAccess) {
-                        if (compatibility == DEX2OAT_OK) doMount(false);
-                        compatibility = DEX2OAT_SEPOLICY_INCORRECT;
-                    } else if (compatibility != DEX2OAT_OK) {
-                        doMount(true);
-                        if (notMounted()) {
-                            doMount(false);
-                            compatibility = DEX2OAT_MOUNT_FAILED;
-                            stopWatching();
-                        } else {
-                            compatibility = DEX2OAT_OK;
-                        }
+                } else if (SELinux.checkSELinuxAccess("u:r:untrusted_app:s0",
+                        "u:object_r:dex2oat_exec:s0", "file", "execute")
+                        || SELinux.checkSELinuxAccess("u:r:untrusted_app:s0",
+                        "u:object_r:dex2oat_exec:s0", "file", "execute_no_trans")) {
+                    if (compatibility == DEX2OAT_OK) doMount(false);
+                    compatibility = DEX2OAT_SEPOLICY_INCORRECT;
+                } else if (compatibility != DEX2OAT_OK) {
+                    doMount(true);
+                    if (notMounted()) {
+                        doMount(false);
+                        compatibility = DEX2OAT_MOUNT_FAILED;
+                        stopWatching();
+                    } else {
+                        compatibility = DEX2OAT_OK;
                     }
                 }
+            }
+
+            @Override
+            public void stopWatching() {
+                super.stopWatching();
+                Log.w(TAG, "SELinux observer stopped");
             }
         };
     }
@@ -130,12 +129,15 @@ public class Dex2OatService implements Runnable {
                 var apex = Os.stat("/proc/1/root" + bin);
                 var wrapper = Os.stat(i < 2 ? WRAPPER32 : WRAPPER64);
                 if (apex.st_dev != wrapper.st_dev || apex.st_ino != wrapper.st_ino) {
+                    Log.w(TAG, "Check mount failed for " + bin);
                     return true;
                 }
             } catch (ErrnoException e) {
+                Log.e(TAG, "Check mount failed for " + bin, e);
                 return true;
             }
         }
+        Log.d(TAG, "Check mount succeeded");
         return false;
     }
 
@@ -160,18 +162,15 @@ public class Dex2OatService implements Runnable {
         selinuxObserver.onEvent(0, null);
     }
 
-    public void stop() {
-        running = false;
-        selinuxObserver.stopWatching();
-    }
-
     @Override
     public void run() {
+        Log.i(TAG, "Dex2oat wrapper daemon start");
         var sockPath = getSockPath();
+        Log.d(TAG, "wrapper path: " + sockPath);
         var magisk_file = "u:object_r:magisk_file:s0";
         var dex2oat_exec = "u:object_r:dex2oat_exec:s0";
-        
-        if (SELinux.checkSELinuxAccess("u:r:dex2oat:s0", dex2oat_exec, "file", "execute_no_trans")) {
+        if (SELinux.checkSELinuxAccess("u:r:dex2oat:s0", dex2oat_exec,
+                "file", "execute_no_trans")) {
             SELinux.setFileContext(WRAPPER32, dex2oat_exec);
             SELinux.setFileContext(WRAPPER64, dex2oat_exec);
             setSockCreateContext("u:r:dex2oat:s0");
@@ -183,25 +182,20 @@ public class Dex2OatService implements Runnable {
         
         try (var server = new LocalServerSocket(sockPath)) {
             setSockCreateContext(null);
-            
-            while (running) {
+            while (true) {
                 try (var client = server.accept();
                      var is = client.getInputStream();
                      var os = client.getOutputStream()) {
-                    int id = is.read();
-                    if (id < 0) break;
-                    if (id >= 0 && id < fdArray.length && fdArray[id] != null) {
-                        os.write(1);
-                        var fd = new FileDescriptor[]{fdArray[id]};
-                        client.setFileDescriptorsForSend(fd);
-                    } else {
-                        os.write(0);
-                    }
-                } catch (IOException e) {
-                    if (!running) break;
+                    var id = is.read();
+                    var fd = new FileDescriptor[]{fdArray[id]};
+                    client.setFileDescriptorsForSend(fd);
+                    os.write(1);
+                    Log.d(TAG, "Sent stock fd: is64 = " + ((id & 0b10) != 0) +
+                            ", isDebug = " + ((id & 0b01) != 0));
                 }
             }
         } catch (IOException e) {
+            Log.e(TAG, "Dex2oat wrapper daemon crashed", e);
             if (compatibility == DEX2OAT_OK) {
                 doMount(false);
                 compatibility = DEX2OAT_CRASHED;
@@ -213,7 +207,10 @@ public class Dex2OatService implements Runnable {
         return compatibility;
     }
 
-    private native void doMountNative(boolean enabled, String r32, String d32, String r64, String d64);
+    private native void doMountNative(boolean enabled,
+                                      String r32, String d32, String r64, String d64);
+
     private static native boolean setSockCreateContext(String context);
+
     private native String getSockPath();
 }
