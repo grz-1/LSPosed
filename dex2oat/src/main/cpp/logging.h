@@ -11,5 +11,4 @@
 
 #define PLOGE(fmt) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, fmt " failed with %d: %s", errno, strerror(errno))
 
-// Remove all other logging macros
 #endif // LOGGING_H
