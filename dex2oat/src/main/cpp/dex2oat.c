@@ -17,173 +17,191 @@
  * Copyright (C) 2022 LSPosed Contributors
  */
 
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-#include <fcntl.h>
+package org.lsposed.lspd.service;
 
-#include "logging.h"
+import static org.lsposed.lspd.ILSPManagerService.*;
 
-#if defined(__LP64__)
-# define LP_SELECT(lp32, lp64) lp64
-#else
-# define LP_SELECT(lp32, lp64) lp32
-#endif
+import android.net.LocalServerSocket;
+import android.os.Build;
+import android.os.FileObserver;
+import android.os.Process;
+import android.os.SELinux;
+import android.system.ErrnoException;
+import android.system.Os;
+import android.system.OsConstants;
+import android.util.Log;
 
-#define ID_VEC(is64, is_debug) (((is64) << 1) | (is_debug))
+import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
-const char kSockName[] = "5291374ceda0aef7c5d86cd2a4f6a3ac";
-static const int kIs64Bit = LP_SELECT(0, 1);
+import java.io.File;
+import java.io.FileDescriptor;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 
-static int is_debug_version(const char *arg0) {
-    const char *p = arg0;
-    while (*p) p++;
-    return (p > arg0 && *(p - 1) == 'd') ? 1 : 0;
-}
+@RequiresApi(Build.VERSION_CODES.Q)
+public class Dex2OatService implements Runnable {
+    private static final String TAG = "LSPosedDex2Oat";
+    private static final String WRAPPER32 = "bin/dex2oat32";
+    private static final String WRAPPER64 = "bin/dex2oat64";
 
-static ssize_t xrecvmsg(int sockfd, struct msghdr *msg, int flags) {
-    ssize_t rec;
-    do {
-        rec = recvmsg(sockfd, msg, flags);
-    } while (rec < 0 && errno == EINTR);
-    return rec;
-}
+    private final String[] dex2oatArray = new String[4];
+    private final FileDescriptor[] fdArray = new FileDescriptor[4];
+    private final FileObserver selinuxObserver;
+    private int compatibility = DEX2OAT_OK;
 
-static void *recv_fds(int sockfd, char *cmsgbuf, size_t bufsz, int cnt) {
-    int ack;
-    struct iovec iov = { .iov_base = &ack, .iov_len = sizeof(ack) };
-    struct msghdr msg = {
-        .msg_iov = &iov,
-        .msg_iovlen = 1,
-        .msg_control = cmsgbuf,
-        .msg_controllen = bufsz
-    };
-
-    if (xrecvmsg(sockfd, &msg, MSG_WAITALL) != sizeof(ack) || ack != 1) {
-        return NULL;
+    private void openDex2oat(int id, String path) {
+        try {
+            FileDescriptor fd = Os.open(path, OsConstants.O_RDONLY, 0);
+            dex2oatArray[id] = path;
+            fdArray[id] = fd;
+        } catch (ErrnoException e) {
+        }
     }
 
-    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
-    if (!cmsg || cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS) {
-        return NULL;
-    }
-    if (msg.msg_controllen < CMSG_SPACE(sizeof(int) * cnt) || 
-        cmsg->cmsg_len < CMSG_LEN(sizeof(int) * cnt)) {
-        return NULL;
-    }
+    public Dex2OatService() {
+        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
+            boolean is64Bit = Process.is64Bit();
+            openDex2oat(is64Bit ? 2 : 0, "/apex/com.android.runtime/bin/dex2oat");
+            openDex2oat(is64Bit ? 3 : 1, "/apex/com.android.runtime/bin/dex2oatd");
+        } else {
+            openDex2oat(0, "/apex/com.android.art/bin/dex2oat32");
+            openDex2oat(1, "/apex/com.android.art/bin/dex2oatd32");
+            openDex2oat(2, "/apex/com.android.art/bin/dex2oat64");
+            openDex2oat(3, "/apex/com.android.art/bin/dex2oatd64");
+        }
 
-    return CMSG_DATA(cmsg);
-}
+        var enforce = Paths.get("/sys/fs/selinux/enforce");
+        var policy = Paths.get("/sys/fs/selinux/policy");
+        var list = new ArrayList<File>();
+        list.add(enforce.toFile());
+        list.add(policy.toFile());
+        selinuxObserver = new FileObserver(list, FileObserver.CLOSE_WRITE) {
+            @Override
+            public synchronized void onEvent(int i, @Nullable String s) {
+                if (compatibility == DEX2OAT_CRASHED) {
+                    stopWatching();
+                    return;
+                }
 
-static int recv_fd(int sockfd) {
-    char cmsgbuf[CMSG_SPACE(sizeof(int))];
-    int result = -1;
-    void *data = recv_fds(sockfd, cmsgbuf, sizeof(cmsgbuf), 1);
-    if (data) {
-        memcpy(&result, data, sizeof(int));
-    }
-    return result;
-}
+                boolean enforcing = false;
+                try (var is = Files.newInputStream(enforce)) {
+                    enforcing = is.read() == '1';
+                } catch (IOException ignored) {
+                }
 
-static int read_int(int fd) {
-    int val;
-    ssize_t bytes_read;
-    do {
-        bytes_read = read(fd, &val, sizeof(val));
-    } while (bytes_read < 0 && errno == EINTR);
-    return (bytes_read == sizeof(val)) ? val : -1;
-}
-
-static int write_int(int fd, int val) {
-    if (fd < 0) return -1;
-    ssize_t bytes_written;
-    do {
-        bytes_written = write(fd, &val, sizeof(val));
-    } while (bytes_written < 0 && errno == EINTR);
-    return (bytes_written == sizeof(val)) ? 0 : -1;
-}
-
-static int set_cloexec(int fd) {
-    int flags = fcntl(fd, F_GETFD);
-    if (flags == -1) return -1;
-    if (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1) return -1;
-    return 0;
-}
-
-static int connect_to_server(const char* sock_name, int* sock_fd) {
-    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
-    if (fd < 0) {
-        PLOGE("socket");
-        return -1;
-    }
-
-    struct sockaddr_un sock = { .sun_family = AF_UNIX };
-    size_t i;
-    for (i = 0; i < sizeof(sock.sun_path) - 2 && sock_name[i] != '\0'; i++) {
-        sock.sun_path[1 + i] = sock_name[i];
-    }
-    sock.sun_path[1 + i] = '\0';
-    
-    size_t len = sizeof(sa_family_t) + i + 1;
-    if (connect(fd, (struct sockaddr *) &sock, len)) {
-        close(fd);
-        return -1;
-    }
-    *sock_fd = fd;
-    return 0;
-}
-
-int main(int argc, char **argv) {
-    int sock_fd = -1;
-    int stock_fd = -1;
-    int ret = 1;
-    char **new_argv = NULL;
-
-    if (connect_to_server(kSockName, &sock_fd) < 0) {
-        goto cleanup;
+                if (!enforcing) {
+                    if (compatibility == DEX2OAT_OK) doMount(false);
+                    compatibility = DEX2OAT_SELINUX_PERMISSIVE;
+                } else if (SELinux.checkSELinuxAccess("u:r:untrusted_app:s0",
+                        "u:object_r:dex2oat_exec:s0", "file", "execute")
+                        || SELinux.checkSELinuxAccess("u:r:untrusted_app:s0",
+                        "u:object_r:dex2oat_exec:s0", "file", "execute_no_trans")) {
+                    if (compatibility == DEX2OAT_OK) doMount(false);
+                    compatibility = DEX2OAT_SEPOLICY_INCORRECT;
+                } else if (compatibility != DEX2OAT_OK) {
+                    doMount(true);
+                    if (notMounted()) {
+                        doMount(false);
+                        compatibility = DEX2OAT_MOUNT_FAILED;
+                        stopWatching();
+                    } else {
+                        compatibility = DEX2OAT_OK;
+                    }
+                }
+            }
+        };
     }
 
-    int id_vec = ID_VEC(kIs64Bit, is_debug_version(argv[0]));
-    if (write_int(sock_fd, id_vec) < 0) {
-        goto cleanup;
+    private boolean notMounted() {
+        for (int i = 0; i < dex2oatArray.length; i++) {
+            String bin = dex2oatArray[i];
+            if (bin == null) continue;
+            try {
+                var apex = Os.stat("/proc/1/root" + bin);
+                var wrapper = Os.stat(i < 2 ? WRAPPER32 : WRAPPER64);
+                if (apex.st_dev != wrapper.st_dev || apex.st_ino != wrapper.st_ino) {
+                    return true;
+                }
+            } catch (ErrnoException e) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    stock_fd = recv_fd(sock_fd);
-    if (stock_fd < 0) {
-        goto cleanup;
+    private void doMount(boolean enabled) {
+        doMountNative(enabled, dex2oatArray[0], dex2oatArray[1], dex2oatArray[2], dex2oatArray[3]);
     }
 
-    close(sock_fd);
-    sock_fd = -1;
+    public void start() {
+        if (notMounted()) {
+            doMount(true);
+            if (notMounted()) {
+                doMount(false);
+                compatibility = DEX2OAT_MOUNT_FAILED;
+                return;
+            }
+        }
 
-    if (set_cloexec(stock_fd) < 0) {
-        goto cleanup;
+        Thread thread = new Thread(this);
+        thread.setName("dex2oat");
+        thread.start();
+        selinuxObserver.startWatching();
+        selinuxObserver.onEvent(0, null);
     }
 
-    size_t new_argv_size = (argc + 2) * sizeof(char *);
-    if (!(new_argv = malloc(new_argv_size))) {
-        goto cleanup;
+    @Override
+    public void run() {
+        String sockPath = getSockPath();
+        String magisk_file = "u:object_r:magisk_file:s0";
+        String dex2oat_exec = "u:object_r:dex2oat_exec:s0";
+        
+        if (SELinux.checkSELinuxAccess("u:r:dex2oat:s0", dex2oat_exec,
+                "file", "execute_no_trans")) {
+            SELinux.setFileContext(WRAPPER32, dex2oat_exec);
+            SELinux.setFileContext(WRAPPER64, dex2oat_exec);
+            setSockCreateContext("u:r:dex2oat:s0");
+        } else {
+            SELinux.setFileContext(WRAPPER32, magisk_file);
+            SELinux.setFileContext(WRAPPER64, magisk_file);
+            setSockCreateContext("u:r:installd:s0");
+        }
+        
+        try (LocalServerSocket server = new LocalServerSocket(sockPath)) {
+            setSockCreateContext(null);
+            while (true) {
+                try (var client = server.accept();
+                     var is = client.getInputStream();
+                     var os = client.getOutputStream()) {
+                    
+                    int id = is.read();
+                    if (id < 0 || id >= fdArray.length || fdArray[id] == null) {
+                        continue;
+                    }
+                    FileDescriptor[] fd = new FileDescriptor[]{fdArray[id]};
+                    client.setFileDescriptorsForSend(fd);
+                    os.write(1);
+                }
+            }
+        } catch (IOException e) {
+            if (compatibility == DEX2OAT_OK) {
+                doMount(false);
+                compatibility = DEX2OAT_CRASHED;
+            }
+        }
     }
-    memcpy(new_argv, argv, argc * sizeof(char *));
-    new_argv[argc] = "--inline-max-code-units=0";
-    new_argv[argc + 1] = NULL;
 
-    if (!getenv("LD_LIBRARY_PATH")) {
-        static char libenv[] = "LD_LIBRARY_PATH=/apex/com.android.art/lib64:/apex/com.android.art/lib:/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib";
-        putenv(libenv);
+    public int getCompatibility() {
+        return compatibility;
     }
 
-    fexecve(stock_fd, new_argv, environ);
-    PLOGE("fexecve");
-    ret = 2;
+    private native void doMountNative(boolean enabled,
+                                      String r32, String d32, String r64, String d64);
 
-cleanup:
-    if (sock_fd >= 0) close(sock_fd);
-    if (stock_fd >= 0) close(stock_fd);
-    free(new_argv);
-    return ret;
+    private static native boolean setSockCreateContext(String context);
+
+    private native String getSockPath();
 }
