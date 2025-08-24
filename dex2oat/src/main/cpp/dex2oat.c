@@ -137,7 +137,6 @@ static int set_cloexec(int fd) {
 static int connect_to_server(const char* sock_name, int* sock_fd) {
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) {
-        PLOGE("socket");
         return -1;
     }
     
@@ -153,7 +152,6 @@ static int connect_to_server(const char* sock_name, int* sock_fd) {
     
     size_t len = sizeof(sa_family_t) + strlen(sock.sun_path + 1) + 1;
     if (connect(fd, (struct sockaddr *) &sock, len)) {
-        PLOGE("failed to connect to %s", sock.sun_path + 1);
         close(fd);
         return -1;
     }
@@ -163,11 +161,10 @@ static int connect_to_server(const char* sock_name, int* sock_fd) {
 }
 
 int main(int argc, char **argv) {
-    LOGD("dex2oat wrapper ppid=%d", getppid());
-    
     int sock_fd = -1;
     int stock_fd = -1;
     int ret = 1;
+    char **new_argv = NULL;
 
     if (connect_to_server(kSockName, &sock_fd) < 0) {
         goto cleanup;
@@ -181,7 +178,6 @@ int main(int argc, char **argv) {
     if (stock_fd < 0) {
         goto cleanup;
     }
-
     if (read_int(sock_fd) < 0) {
         goto cleanup;
     }
@@ -189,26 +185,28 @@ int main(int argc, char **argv) {
     close(sock_fd);
     sock_fd = -1;
 
-    LOGD("sock: %s %d", kSockName, stock_fd);
-
-    const char *new_argv[argc + 2];
-    for (int i = 0; i < argc; i++) new_argv[i] = argv[i];
+    new_argv = malloc((argc + 2) * sizeof(char *));
+    if (!new_argv) {
+        goto cleanup;
+    }
+    
+    for (int i = 0; i < argc; i++) {
+        new_argv[i] = argv[i];
+    }
     new_argv[argc] = "--inline-max-code-units=0";
     new_argv[argc + 1] = NULL;
 
     if (getenv("LD_LIBRARY_PATH") == NULL) {
-        char const *libenv =
-                "LD_LIBRARY_PATH=/apex/com.android.art/lib64:/apex/com.android.art/lib"
-                ":/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib";
-        putenv((char *)libenv);
+        static char libenv[] = "LD_LIBRARY_PATH=/apex/com.android.art/lib64:/apex/com.android.art/lib:/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib";
+        putenv(libenv);
     }
 
-    fexecve(stock_fd, (char **) new_argv, environ);
-    PLOGE("fexecve failed");
+    fexecve(stock_fd, new_argv, environ);
     ret = 2;
 
 cleanup:
     if (sock_fd >= 0) close(sock_fd);
     if (stock_fd >= 0) close(stock_fd);
+    free(new_argv);
     return ret;
 }
