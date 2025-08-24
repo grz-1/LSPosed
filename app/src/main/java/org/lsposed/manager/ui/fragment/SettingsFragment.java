@@ -345,20 +345,16 @@ public class SettingsFragment extends BaseFragment {
             Preference fakeDumpInfoPreference = findPreference("fakedumphookdebuginfo");
             if (fakeDumpInfoPreference != null) {
                 fakeDumpInfoPreference.setOnPreferenceClickListener(preference -> {
-                    dumpDebugInfo();
+                    LocalDateTime now = LocalDateTime.now();
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+                    String timestamp = now.format(formatter);
+                    String fileName = "/data/adb/lspd/log/dump_hook_debug_" + timestamp + ".log";
+                    parentFragment.showHint(getString(R.string.settings_fake_dumped, fileName), true);
                     return true;
                 });
             }
         }
         
-        private void dumpDebugInfo() {
-            LocalDateTime now = LocalDateTime.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
-            String timestamp = now.format(formatter);
-            String fileName = "/data/adb/lspd/log/dump_hook_debug_" + timestamp + ".log";
-            parentFragment.showHint(getString(R.string.settings_fake_dumped, fileName), true);
-        }
-
         @NonNull
         @Override
         public RecyclerView onCreateRecyclerView(@NonNull LayoutInflater inflater, @NonNull ViewGroup parent, Bundle savedInstanceState) {
