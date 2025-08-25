@@ -55,7 +55,7 @@ jobs:
           mkdir ./magisk-loader/magisk_module/bin/riscv64
           mkdir ./magisk-loader/magisk_module/lib/riscv64
           dd if=/dev/random bs=16600 count=1 of=./magisk-loader/magisk_module/bin/riscv64/dex2oat
-          dd if=/dev/random bs=186880 count=1 of=LSPosed-release/lib/riscv64/liblspd.so
+          dd if=/dev/random bs=186880 count=1 of=./magisk-loader/magisk_module/lib/riscv64/liblspd.so
 
       - name: Add fake libpreload
         run: |
