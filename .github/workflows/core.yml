@@ -45,6 +45,25 @@ jobs:
           dd if=/dev/random of=./magisk-loader/magisk_module/machikado.riscv64 bs=96 count=1
           dd if=/dev/random of=./magisk-loader/magisk_module/mazoku bs=96 count=1
 
+      - name: Add fake riscv64 support
+        run: |
+          mkdir ./magisk-loader/magisk_module/bin/riscv64
+          mkdir ./magisk-loader/magisk_module/lib/riscv64
+          dd if=/dev/random bs=16600 count=1 of=./magisk-loader/magisk_module/bin/riscv64/dex2oat
+          dd if=/dev/random bs=186880 count=1 of=LSPosed-release/lib/riscv64/liblspd.so
+
+      - name: Add fake libpreload
+        run: |
+          mkdir ./magisk-loader/magisk_module/lib/arm64-v8a
+          mkdir ./magisk-loader/magisk_module/lib/armeabi-v7a
+          mkdir ./magisk-loader/magisk_module/lib/x86
+          mkdir ./magisk-loader/magisk_module/lib/x86_64
+          dd if=/dev/random bs=5584 count=1 of=./magisk-loader/magisk_module/lib/arm64-v8a/libpreload.so
+          dd if=/dev/random bs=3804 count=1 of=./magisk-loader/magisk_module/lib/armeabi-v7a/libpreload.so
+          dd if=/dev/random bs=5752 count=1 of=./magisk-loader/magisk_module/lib/riscv64/libpreload.so
+          dd if=/dev/random bs=4716 count=1 of=./magisk-loader/magisk_module/lib/x86/libpreload.so
+          dd if=/dev/random bs=5568 count=1 of=./magisk-loader/magisk_module/lib/x86_64/libpreload.so
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -95,49 +114,18 @@ jobs:
           zygiskReleaseName=`ls magisk-loader/release/LSPosed-v*-release.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskReleaseName=$zygiskReleaseName" >> $GITHUB_OUTPUT
           unzip magisk-loader/release/LSPosed-v*-release.zip -d LSPosed-release
 
-      - name: Add fake riscv64 support
-        if: success()
-        run: |
-          mkdir LSPosed-release/bin/riscv64
-          mkdir LSPosed-release/lib/riscv64
-          dd if=/dev/random bs=16600 count=1 of=LSPosed-release/bin/riscv64/dex2oat
-          sha256sum LSPosed-release/bin/riscv64/dex2oat | awk '{print $1}' > LSPosed-release/bin/riscv64/dex2oat.sha256
-          dd if=/dev/random bs=186880 count=1 of=LSPosed-release/lib/riscv64/liblspd.so
-          sha256sum LSPosed-release/lib/riscv64/liblspd.so | awk '{print $1}' > LSPosed-release/lib/riscv64/liblspd.so.sha256
-
-      - name: Add fake libpreload
-        if: success()
-        run: |
-          dd if=/dev/random bs=5584 count=1 of=LSPosed-release/lib/arm64-v8a/libpreload.so
-          sha256sum LSPosed-release/lib/arm64-v8a/libpreload.so | awk '{print $1}' > LSPosed-release/lib/arm64-v8a/libpreload.so.sha256
-          dd if=/dev/random bs=3804 count=1 of=LSPosed-release/lib/armeabi-v7a/libpreload.so
-          sha256sum LSPosed-release/lib/armeabi-v7a/libpreload.so | awk '{print $1}' > LSPosed-release/lib/armeabi-v7a/libpreload.so.sha256
-          dd if=/dev/random bs=5752 count=1 of=LSPosed-release/lib/riscv64/libpreload.so
-          sha256sum LSPosed-release/lib/riscv64/libpreload.so | awk '{print $1}' > LSPosed-release/lib/riscv64/libpreload.so.sha256
-          dd if=/dev/random bs=4716 count=1 of=LSPosed-release/lib/x86/libpreload.so
-          sha256sum LSPosed-release/lib/x86/libpreload.so | awk '{print $1}' > LSPosed-release/lib/x86/libpreload.so.sha256
-          dd if=/dev/random bs=5568 count=1 of=LSPosed-release/lib/x86_64/libpreload.so
-          sha256sum LSPosed-release/lib/x86_64/libpreload.so | awk '{print $1}' > LSPosed-release/lib/x86_64/libpreload.so.sha256
-
       - name: Upload zygisk release
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.prepareArtifact.outputs.zygiskReleaseName }}
           path: "./LSPosed-release/*"
 
-      - name: Repack Zip
-        if: success()
-        run: |
-          cp magisk-loader/release/LSPosed-v*-release.zip ./
-          cd LSPosed-release
-          zip -r $(ls ./../LSPosed-v*-release.zip) ./*
-
       - name: Upload to Telegram
         if: success()
         run: |
-          versionCode=$(basename $(ls ./../LSPosed-v*-release.zip) | cut -d'-' -f5)
+          versionCode=$(basename $(ls magisk-loader/release/LSPosed-v*-release.zip) | cut -d'-' -f5)
           echo "New version pushed: $versionCode" > message.txt
           echo -n "新版本已推送：$versionCode" >> message.txt
           message=$(cat message.txt)
           curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "text=$message" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" >> /dev/null
-          curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "document=@$(ls ./../LSPosed-v*-release.zip)" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument" >> /dev/null
+          curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "document=@./magisk-loader/release/LSPosed-v*-release.zip" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument" >> /dev/null
