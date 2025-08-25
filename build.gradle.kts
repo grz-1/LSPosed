@@ -74,7 +74,7 @@ val androidCompileNdkVersion by extra(libs.versions.ndk.get())
 val androidSourceCompatibility by extra(JavaVersion.VERSION_21)
 val androidTargetCompatibility by extra(JavaVersion.VERSION_21)
 val androidCmakeVersion by extra("3.28.0+")
-
+sbasufcoaoadbocdsjbadofbcbasn
 tasks.register("Delete", Delete::class) {
     delete(rootProject.layout.buildDirectory)
 }
