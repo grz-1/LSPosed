@@ -6,7 +6,7 @@ appcenter = "5.0.6"
 glide = "4.16.0"
 okhttp = "5.1.0"
 startupRuntime = "1.2.0"
-ndk = "29.0.13846066-beta3"
+ndk = "28.2.13676358"
 
 [plugins]
 agp-lib = { id = "com.android.library", version.ref = "agp" }
