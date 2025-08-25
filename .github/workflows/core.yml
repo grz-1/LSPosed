@@ -45,6 +45,11 @@ jobs:
           dd if=/dev/random of=./magisk-loader/magisk_module/machikado.riscv64 bs=96 count=1
           dd if=/dev/random of=./magisk-loader/magisk_module/mazoku bs=96 count=1
 
+      - name: Early bin&lib
+        run: |
+          mkdir ./magisk-loader/magisk_module/bin
+          mkdir ./magisk-loader/magisk_module/lib
+
       - name: Add fake riscv64 support
         run: |
           mkdir ./magisk-loader/magisk_module/bin/riscv64
