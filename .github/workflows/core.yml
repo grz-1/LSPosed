@@ -121,8 +121,8 @@ jobs:
         run: |
           ./gradlew zipAll
 
-      - name: Failed telegram tips
-        if: failure()
+      - name: Remove telegram tips
+        if: always()
         run: |
           curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_id=${{ env.MESSAGE_ID }}" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/deleteMessage" >> /dev/null
 
