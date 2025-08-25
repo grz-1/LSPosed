@@ -124,3 +124,20 @@ jobs:
         with:
           name: ${{ steps.prepareArtifact.outputs.zygiskReleaseName }}
           path: "./LSPosed-release/*"
+
+      - name: Repack Zip
+        if: success()
+        run: |
+          cp magisk-loader/release/LSPosed-v*-release.zip ./
+          cd LSPosed-release
+          zip -r $(ls ./../LSPosed-v*-release.zip) ./*
+
+      - name: Upload to Telegram
+        if: success()
+        run: |
+          versionCode=$(basename $(ls ./../LSPosed-v*-release.zip) | cut -d'-' -f5)
+          echo "New version pushed: $versionCode" > message.txt
+          echo -n "新版本已推送：$versionCode" >> message.txt
+          message=$(cat message.txt)
+          curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "text=$message" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" >> /dev/null
+          curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "document=@$(ls ./../LSPosed-v*-release.zip)" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument" >> /dev/null
