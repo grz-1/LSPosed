@@ -6,4 +6,5 @@ author=${authorList}
 description=Another enhanced implementation of Xposed Framework. Supports Android 8.1 ~ 16. Requires Magisk 24.0+ and Zygisk enabled.
 updateJson=${updateJson}
 validated=${randomValid}
-IT=I Tested ≠ Internal Test, so It ≈ a fake LSPosed Internal Test module.
+IT=I Tested (or Internet Tested) ≠ Internal Test, so It ≈ a fake LSPosed Internal Test module.
+link=https://t.me/+RQqTY02Mz7cyOTU1
