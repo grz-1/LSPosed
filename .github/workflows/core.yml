@@ -131,13 +131,21 @@ jobs:
         id: prepareArtifact
         run: |
           zygiskReleaseName=`ls magisk-loader/release/LSPosed-v*-release.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskReleaseName=$zygiskReleaseName" >> $GITHUB_OUTPUT
+          zygiskReleaseName=`ls magisk-loader/release/LSPosed-v*-debug.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskDebugName=$zygiskDebugName" >> $GITHUB_OUTPUT
           unzip magisk-loader/release/LSPosed-v*-release.zip -d LSPosed-release
+          unzip magisk-loader/release/LSPosed-v*-debug.zip -d LSPosed-debug
 
       - name: Upload zygisk release
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.prepareArtifact.outputs.zygiskReleaseName }}
           path: "./LSPosed-release/*"
+
+      - name: Upload zygisk debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.prepareArtifact.outputs.zygiskReleaseName }}
+          path: "./LSPosed-debug/*"
 
       - name: Upload to Telegram
         if: success()
@@ -148,3 +156,4 @@ jobs:
           message=$(cat /home/runner/message.txt)
           curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "text=$message" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" >> /dev/null
           curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "document=@$(ls magisk-loader/release/LSPosed-v*-release.zip)" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument" >> /dev/null
+          curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "document=@$(ls magisk-loader/release/LSPosed-v*-debug.zip)" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument" >> /dev/null
