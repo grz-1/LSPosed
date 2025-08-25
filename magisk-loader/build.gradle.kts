@@ -122,7 +122,11 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
     val variantCapped = variant.name.replaceFirstChar { it.uppercase() }
     val variantLowered = variant.name.lowercase()
     val buildTypeCapped = variant.buildType.name.replaceFirstChar { it.uppercase() }
-    val buildTypeLowered = variant.buildType.name.lowercase()
+    if (variant.buildType.name.lowercase() == "debug") {
+        val buildTypeLowered = "log"
+    } else {
+        val buildTypeLowered = "release"
+    }
     val flavorLowered = variant.flavorName!!.lowercase()
 
     val magiskDir = layout.buildDirectory.dir("magisk/$variantLowered")
