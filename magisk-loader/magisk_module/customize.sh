@@ -70,7 +70,7 @@ rm -f /data/adb/lspd/manager.apk
 # Extract libs
 ui_print "- Extracting module files"
 
-extract "machikado.$ARCH" "" "machikado"
+extract "mechikado.$ARCH" "" "mechikado"
 
 mkdir -p "$MODPATH/zygisk"
 mkdir -p "$MODPATH/lib"
@@ -104,7 +104,7 @@ extract 'daemon.apk'
 extract 'daemon'
 extract 'lspd'
 extract 'manager.apk'
-extract "mazoku"
+extract "mezoku"
 
 ui_print "- Extracting libraries"
 
