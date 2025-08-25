@@ -140,7 +140,7 @@ public abstract class BaseFragment extends Fragment {
     }
 
     public void showHint(CharSequence str, boolean lengthShort, CharSequence actionStr, View.OnClickListener action) {
-        var container = requireActivity().findViewById(android.R.id.content);
+        var container = getView();
         if (isResumed() && container != null) {
             var snackbar = Snackbar.make(container, str, lengthShort ? Snackbar.LENGTH_SHORT : Snackbar.LENGTH_LONG);
             var fab = container.findViewById(R.id.fab);
