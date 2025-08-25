@@ -25,6 +25,14 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Send telegram tips
+        run: |
+          count=$(( $(git rev-list --count origin/dev) + 4200 ))
+          echo "New version building: $count" > /home/runner/message.txt
+          echo -n "新版本构建中：$count" >> /home/runner/message.txt
+          message=$(cat /home/runner/message.txt)
+          curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "text=$message" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" >> /dev/null
+
       - name: Write key
         if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' ) || github.ref_type == 'tag' }}
         run: |
@@ -112,6 +120,15 @@ jobs:
         run: |
           ./gradlew zipAll
 
+      - name: Failed telegram tips
+        if: failure()
+        run: |
+          count=$(( $(git rev-list --count origin/dev) + 4200 ))
+          echo "Version building failed: $count" > /home/runner/message.txt
+          echo -n "版本构建失败：$count" >> /home/runner/message.txt
+          message=$(cat /home/runner/message.txt)
+          curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "text=$message" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" >> /dev/null
+
       - name: Prepare artifact
         if: success()
         id: prepareArtifact
@@ -129,8 +146,8 @@ jobs:
         if: success()
         run: |
           versionCode=$(basename $(ls magisk-loader/release/LSPosed-v*-release.zip) | cut -d'-' -f5)
-          echo "New version pushed: $versionCode" > message.txt
-          echo -n "新版本已推送：$versionCode" >> message.txt
-          message=$(cat message.txt)
+          echo "New version pushed: $versionCode" > /home/runner/message.txt
+          echo -n "新版本已推送：$versionCode" >> /home/runner/message.txt
+          message=$(cat /home/runner/message.txt)
           curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "text=$message" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" >> /dev/null
           curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "document=@$(ls magisk-loader/release/LSPosed-v*-release.zip)" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument" >> /dev/null
