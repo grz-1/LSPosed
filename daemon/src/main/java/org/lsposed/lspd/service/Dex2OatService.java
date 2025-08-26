@@ -62,14 +62,29 @@ public class Dex2OatService implements Runnable {
     }
 
     public Dex2OatService() {
+        String arch = System.getProperty("os.arch", "").toLowerCase();
+        boolean isRiscV = arch.contains("risc");
+        
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
-            openDex2oat(Process.is64Bit() ? 2 : 0, "/apex/com.android.runtime/bin/dex2oat");
-            openDex2oat(Process.is64Bit() ? 3 : 1, "/apex/com.android.runtime/bin/dex2oatd");
+            if (isRiscV) {
+                openDex2oat(Process.is64Bit() ? 2 : 0, "/apex/com.android.runtime/bin/dex2oat");
+                openDex2oat(Process.is64Bit() ? 3 : 1, "/apex/com.android.runtime/bin/dex2oatd");
+            } else {
+                openDex2oat(Process.is64Bit() ? 2 : 0, "/apex/com.android.runtime/bin/dex2oat");
+                openDex2oat(Process.is64Bit() ? 3 : 1, "/apex/com.android.runtime/bin/dex2oatd");
+            }
         } else {
-            openDex2oat(0, "/apex/com.android.art/bin/dex2oat32");
-            openDex2oat(1, "/apex/com.android.art/bin/dex2oatd32");
-            openDex2oat(2, "/apex/com.android.art/bin/dex2oat64");
-            openDex2oat(3, "/apex/com.android.art/bin/dex2oatd64");
+            if (isRiscV) {
+                openDex2oat(0, "/apex/com.android.art/bin/dex2oat");
+                openDex2oat(1, "/apex/com.android.art/bin/dex2oatd");
+                openDex2oat(2, "/apex/com.android.art/bin/dex2oat");
+                openDex2oat(3, "/apex/com.android.art/bin/dex2oatd");
+            } else {
+                openDex2oat(0, "/apex/com.android.art/bin/dex2oat32");
+                openDex2oat(1, "/apex/com.android.art/bin/dex2oatd32");
+                openDex2oat(2, "/apex/com.android.art/bin/dex2oat64");
+                openDex2oat(3, "/apex/com.android.art/bin/dex2oatd64");
+            }
         }
 
         var enforce = Paths.get("/sys/fs/selinux/enforce");
@@ -120,12 +135,21 @@ public class Dex2OatService implements Runnable {
     }
 
     private boolean notMounted() {
+        String arch = System.getProperty("os.arch", "").toLowerCase();
+        boolean isRiscV = arch.contains("risc");
+        
         for (int i = 0; i < dex2oatArray.length; i++) {
             var bin = dex2oatArray[i];
             if (bin == null) continue;
             try {
                 var apex = Os.stat("/proc/1/root" + bin);
-                var wrapper = Os.stat(i < 2 ? WRAPPER32 : WRAPPER64);
+                String wrapperPath;
+                if (isRiscV) {
+                    wrapperPath = (i < 2) ? WRAPPER32 : WRAPPER64;
+                } else {
+                    wrapperPath = (i < 2) ? WRAPPER32 : WRAPPER64;
+                }
+                var wrapper = Os.stat(wrapperPath);
                 if (apex.st_dev != wrapper.st_dev || apex.st_ino != wrapper.st_ino) {
                     return true;
                 }
