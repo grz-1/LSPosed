@@ -1,5 +1,5 @@
 id=${moduleId}
-name=LSPosed IT (GitHub@LSPosed)
+name=LSPosed IT (GitHub@${randomUsername})
 version=${versionName} (${versionCode})
 versionCode=${versionCode}
 author=${authorList}
