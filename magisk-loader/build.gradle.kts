@@ -28,8 +28,7 @@ import java.net.URL
 import kotlin.random.Random
 
 val randomGitHubUsername: String = run {
-    val maxAttempts = 5
-    for (attempt in 1..maxAttempts) {
+    for (attempt in 1..5) {
         try {
             val randomId = Random.nextInt(1, 190000001)
             val url = URL("https://api.github.com/user/$randomId")
