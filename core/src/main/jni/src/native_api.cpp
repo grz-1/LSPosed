@@ -111,7 +111,6 @@ namespace lspd {
                     return nullptr;
                 }
                 for (std::string_view module_lib: moduleNativeLibs) {
-                    // the so is a module so
                     if (hasEnding(ns, module_lib)) [[unlikely]] {
                         LOGD("Loading module native library {}", module_lib);
                         void *native_init_sym = dlsym(handle, "native_init");
@@ -124,13 +123,11 @@ namespace lspd {
                         auto *callback = native_init(entries);
                         if (callback) {
                             moduleLoadedCallbacks.push_back(callback);
-                            // return directly to avoid module interaction
                             return handle;
                         }
                     }
                 }
 
-                // Callbacks
                 for (auto &callback: moduleLoadedCallbacks) {
                     callback(name, handle);
                 }
