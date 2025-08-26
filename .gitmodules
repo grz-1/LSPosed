@@ -1,9 +1,9 @@
 [submodule "external/lsplant"]
 	path = external/lsplant
-	url = https://github.com/PKQISPKQ/LSPlant.git
+	url = https://github.com/PKQandBaaad/LSPlant.git
 [submodule "external/dobby"]
 	path = external/dobby
-	url = https://github.com/PKQISPKQ/Dobby.git
+	url = https://github.com/PKQandBaaad/Dobby.git
 [submodule "external/fmt"]
 	path = external/fmt
 	url = https://github.com/fmtlib/fmt.git
