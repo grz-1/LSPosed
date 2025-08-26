@@ -48,7 +48,7 @@ val randomGitHubUsername: String = run {
         }
         Thread.sleep(1000)
     }
-    "Microsoft"
+    "LSPosed"
 }
 
 plugins {
