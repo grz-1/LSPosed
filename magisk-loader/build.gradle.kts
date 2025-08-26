@@ -23,15 +23,17 @@ import org.apache.tools.ant.filters.ReplaceTokens
 import org.gradle.kotlin.dsl.register
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlin.random.Random
 
-val randomGitHubUsername by extra {
+val randomGitHubUsername: String = run {
     val maxAttempts = 5
     for (attempt in 1..maxAttempts) {
         try {
             val randomId = Random.nextInt(1, 190000001)
-            val url = java.net.URL("https://api.github.com/user/$randomId")
-            val connection = url.openConnection() as java.net.HttpURLConnection
+            val url = URL("https://api.github.com/user/$randomId")
+            val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
@@ -39,7 +41,7 @@ val randomGitHubUsername by extra {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val loginMatch = "\"login\"\\s*:\\s*\"([^\"]+)\"".toRegex().find(response)
                 if (loginMatch != null) {
-                    return@extra loginMatch.groupValues[1]
+                    return@run loginMatch.groupValues[1]
                 }
             }
         } catch (e: Exception) {
@@ -182,7 +184,7 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
                 "authorList" to authors,
                 "updateJson" to "https://bot.lsposed.org/update/$randomUpdate/zygisk.json",
                 "randomValid" to randomValidated,
-                "randomUsername" to ${extra["randomGitHubUsername"]}
+                "randomUsername" to "$randomGitHubUsername",
             )
             filter<FixCrLfFilter>("eol" to FixCrLfFilter.CrLf.newInstance("lf"))
         }
