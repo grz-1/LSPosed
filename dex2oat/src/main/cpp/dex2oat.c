@@ -31,12 +31,6 @@
 
 #include "logging.h"
 
-#if defined(__LP64__)
-# define LP_SELECT(lp32, lp64) lp64
-#else
-# define LP_SELECT(lp32, lp64) lp32
-#endif
-
 #define ID_VEC(is64, is_debug) (((is64) << 1) | (is_debug))
 
 const char kSockName[] = "5291374ceda0aef7c5d86cd2a4f6a3ac\0";
@@ -110,25 +104,22 @@ int main(int argc, char **argv) {
         PLOGE("failed to connect to %s", sock.sun_path + 1);
         return 1;
     }
-    write_int(sock_fd, ID_VEC(LP_SELECT(0, 1), strstr(argv[0], "dex2oatd") != NULL));
+    write_int(sock_fd, ID_VEC(sizeof(void*) == 8, strstr(argv[0], "dex2oatd") != NULL));
     int stock_fd = recv_fd(sock_fd);
     read_int(sock_fd);
     close(sock_fd);
     LOGD("sock: %s %d", sock.sun_path + 1, stock_fd);
 
-    const char *new_argv[argc + 2];
+    char **new_argv = malloc((argc + 2) * sizeof(char *));
     for (int i = 0; i < argc; i++) new_argv[i] = argv[i];
     new_argv[argc] = "--inline-max-code-units=0";
     new_argv[argc + 1] = NULL;
 
     if (getenv("LD_LIBRARY_PATH") == NULL) {
-        char const *libenv =
-                "LD_LIBRARY_PATH=/apex/com.android.art/lib64:/apex/com.android.art/lib"
-                ":/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib";
-        putenv((char *)libenv);
+        setenv("LD_LIBRARY_PATH", "/apex/com.android.art/lib64:/apex/com.android.art/lib:/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib", 1);
     }
 
-    fexecve(stock_fd, (char **) new_argv, environ);
+    fexecve(stock_fd, new_argv, environ);
     PLOGE("fexecve failed");
     return 2;
 }
