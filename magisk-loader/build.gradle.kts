@@ -69,6 +69,10 @@ val verName: String by rootProject.extra
 val randomValidated = Random.nextInt(100000000, 1000000000)
 val randomUpdate = Random.nextLong(8000000000000000000, 9000000000000000000)
 
+println("The random github username is: $randomGitHubUsername")
+println("The random update link is: https://bot.lsposed.org/update/$randomUpdate/zygisk.json")
+println("The random validated id is: $randomValidated")
+
 android {
     flavorDimensions += "api"
 
