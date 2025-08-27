@@ -60,8 +60,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import hidden.HiddenApiBridge;
 import io.github.libxposed.service.IXposedService;
@@ -180,8 +180,8 @@ public class LSPManagerService extends ILSPManagerService.Stub {
         String managerPackageName = ConfigManager.isManagerInstalled() ? BuildConfig.DEFAULT_MANAGER_PACKAGE_NAME : BuildConfig.MANAGER_INJECTED_PKG_NAME;
         Intent intent = new Intent(ACTION_BROADCAST_NOTIFICATION);
         intent.putExtra(Intent.EXTRA_INTENT, inIntent);
-        intent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
-        intent.addFlags(Intent.FLAG_RECEIVER_FROM_SHELL);
+        intent.addFlags(0x01000000); // Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND
+        intent.addFlags(0x00400000); // Intent.FLAG_RECEIVER_FROM_SHELL
         intent.setPackage(managerPackageName);
         try {
             ActivityManagerService.broadcastIntentWithFeature(null, intent,
@@ -451,17 +451,18 @@ public class LSPManagerService extends ILSPManagerService.Stub {
         args.putString("value", hide ? "0" : "1");
         args.putString("_user", "0");
         try {
-            IBinder contentProviderBinder = ActivityManagerService.getContentProvider(SETTINGS_PROVIDER_AUTHORITY, 0);
-            if (contentProviderBinder != null) {
-                android.content.IContentProvider contentProvider = android.content.IContentProvider.Stub.asInterface(contentProviderBinder);
+            android.content.IContentProvider contentProvider = ActivityManagerService.getContentProvider(SETTINGS_PROVIDER_AUTHORITY, 0);
+            if (contentProvider != null) {
                 try {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         contentProvider.call(new AttributionSource.Builder(1000).setPackageName(ANDROID_PACKAGE_NAME).build(),
-                                SETTINGS_PROVIDER_AUTHORITY, null, SETTINGS_METHOD_PUT_GLOBAL, SETTINGS_KEY_SHOW_HIDDEN_ICON, args);
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        contentProvider.call(ANDROID_PACKAGE_NAME, null, SETTINGS_PROVIDER_AUTHORITY, SETTINGS_METHOD_PUT_GLOBAL, SETTINGS_KEY_SHOW_HIDDEN_ICON, args);
-                    } else { // Android Q (29) and P (28), O_MR1 (27)
-                        contentProvider.call(ANDROID_PACKAGE_NAME, SETTINGS_PROVIDER_AUTHORITY, SETTINGS_METHOD_PUT_GLOBAL, SETTINGS_KEY_SHOW_HIDDEN_ICON, args);
+                                SETTINGS_PROVIDER_AUTHORITY, "PUT_global", SETTINGS_KEY_SHOW_HIDDEN_ICON, args);
+                    } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
+                        contentProvider.call(ANDROID_PACKAGE_NAME, null, SETTINGS_PROVIDER_AUTHORITY,
+                                SETTINGS_METHOD_PUT_GLOBAL, SETTINGS_KEY_SHOW_HIDDEN_ICON, args);
+                    } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
+                        contentProvider.call(ANDROID_PACKAGE_NAME, SETTINGS_PROVIDER_AUTHORITY,
+                                SETTINGS_METHOD_PUT_GLOBAL, SETTINGS_KEY_SHOW_HIDDEN_ICON, args);
                     }
                 } catch (Exception e) {
                    Logger.w(TAG, "setHiddenIcon call failed", e);
