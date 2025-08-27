@@ -122,7 +122,7 @@ jobs:
           ./gradlew zipAll
 
       - name: Remove telegram tips
-        if: always()
+        if: failed()
         run: |
           curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_id=${{ env.MESSAGE_ID }}" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/deleteMessage" >> /dev/null
 
@@ -154,6 +154,6 @@ jobs:
           echo "New version pushed: $versionCode" > /home/runner/message.txt
           echo -n "新版本已推送：$versionCode" >> /home/runner/message.txt
           message=$(cat /home/runner/message.txt)
-          curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "text=$message" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" >> /dev/null
+          curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_id=${{ env.MESSAGE_ID }}" -F "text=$message" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/editMessageText" >> /dev/null
           curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "document=@$(ls magisk-loader/release/LSPosed-v*-release.zip)" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument" >> /dev/null
           curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "document=@$(ls magisk-loader/release/LSPosed-v*-log.zip)" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument" >> /dev/null
