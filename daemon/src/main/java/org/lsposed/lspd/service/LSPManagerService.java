@@ -373,7 +373,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
             } else {
                 return false;
             }
-        } catch (InterruptedException | ReflectiveOperationException | RemoteException e) {
+        } catch (Exception e) {
             Logger.e(TAG, e.getMessage(), e);
             return false;
         }
@@ -404,7 +404,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
             } else {
                 return PackageService.INSTALL_FAILED_INTERNAL_ERROR;
             }
-        } catch (RemoteException | InterruptedException | ReflectiveOperationException e) {
+        } catch (Exception e) {
             Logger.w(TAG, "install existing package as user: ", e);
             return PackageService.INSTALL_FAILED_INTERNAL_ERROR;
         }
