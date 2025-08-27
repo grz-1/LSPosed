@@ -58,6 +58,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import hidden.HiddenApiBridge;
@@ -65,13 +68,16 @@ import io.github.libxposed.service.IXposedService;
 import rikka.parcelablelist.ParcelableListSlice;
 
 public class LSPManagerService extends ILSPManagerService.Stub {
-
     private static Intent managerIntent = null;
     private boolean enabled = true;
+    private volatile Map<String, PackageInfo> packageInfoCache = new ConcurrentHashMap<>();
+    private long cacheLastUpdated = 0;
+    private static final long CACHE_EXPIRY_MS = TimeUnit.MINUTES.toMillis(5);
+    private final Map<String, Long> lastCallTime = new ConcurrentHashMap<>();
+    private static final long MIN_CALL_INTERVAL = TimeUnit.SECONDS.toMillis(1);
 
     public class ManagerGuard implements IBinder.DeathRecipient {
-        private final @NonNull
-        IBinder binder;
+        private final @NonNull IBinder binder;
         private final int pid;
         private final int uid;
         private final IServiceConnection connection = new IServiceConnection.Stub() {
@@ -115,11 +121,6 @@ public class LSPManagerService extends ILSPManagerService.Stub {
     }
 
     public ManagerGuard guard = null;
-
-    // guard to determine the manager or the injected app
-    // that is to say, to make the parasitic success,
-    // we should make sure no extra launch after parasitic
-    // launch is queued and before the process is started
     private boolean pendingManager = false;
     private int managerPid = -1;
 
@@ -172,8 +173,8 @@ public class LSPManagerService extends ILSPManagerService.Stub {
         String managerPackageName = ConfigManager.isManagerInstalled() ? BuildConfig.DEFAULT_MANAGER_PACKAGE_NAME : BuildConfig.MANAGER_INJECTED_PKG_NAME;
         var intent = new Intent("org.lsposed.manager.NOTIFICATION");
         intent.putExtra(Intent.EXTRA_INTENT, inIntent);
-        intent.addFlags(0x01000000); //Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND
-        intent.addFlags(0x00400000); //Intent.FLAG_RECEIVER_FROM_SHELL
+        intent.addFlags(0x01000000);
+        intent.addFlags(0x00400000);
         intent.setPackage(managerPackageName);
         try {
             ActivityManagerService.broadcastIntentWithFeature(null, intent,
@@ -210,13 +211,51 @@ public class LSPManagerService extends ILSPManagerService.Stub {
             var pkgInfo = PackageService.getPackageInfo(BuildConfig.MANAGER_INJECTED_PKG_NAME, 0, 0);
             if (pkgInfo != null) {
                 var cacheDir = new File(HiddenApiBridge.ApplicationInfo_credentialProtectedDataDir(pkgInfo.applicationInfo) + "/cache");
-                // The cache directory does not exist after `pm clear`
                 cacheDir.mkdirs();
                 ensureWebViewPermission(cacheDir);
             }
         } catch (Throwable e) {
-            Log.w(TAG, "cannot ensure webview dir", e);
+            if (BuildConfig.DEBUG) Log.d(TAG, "cannot ensure webview dir", e);
+            else Log.w(TAG, "cannot ensure webview dir");
         }
+    }
+
+    private boolean verifyCallingIdentity(int pid, int uid) {
+        try {
+            int actualUid = ActivityManagerService.getUidForPid(pid);
+            return actualUid == uid;
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to verify calling identity", e);
+            return false;
+        }
+    }
+
+    private boolean isValidPackageName(String packageName) {
+        return packageName != null && packageName.matches("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)*$");
+    }
+
+    private void logError(String methodName, String message, Throwable throwable) {
+        Log.e(TAG, methodName + ": " + message + " - " + (throwable != null ? throwable.getMessage() : "No exception"));
+        if (throwable != null) {
+            Log.e(TAG, "Stack trace:", throwable);
+        }
+    }
+
+    private void logDebug(String methodName, String message) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, methodName + ": " + message);
+        }
+    }
+
+    private void checkRateLimit(String methodName) {
+        long now = System.currentTimeMillis();
+        Long lastCall = lastCallTime.get(methodName);
+        
+        if (lastCall != null && (now - lastCall) < MIN_CALL_INTERVAL) {
+            throw new SecurityException("Rate limit exceeded for method: " + methodName);
+        }
+        
+        lastCallTime.put(methodName, now);
     }
 
     synchronized boolean preStartManager() {
@@ -225,29 +264,30 @@ public class LSPManagerService extends ILSPManagerService.Stub {
         return true;
     }
 
-    // return true to inject manager
     synchronized boolean shouldStartManager(int pid, int uid, String processName) {
         if (!enabled || uid != BuildConfig.MANAGER_INJECTED_UID || !BuildConfig.DEFAULT_MANAGER_PACKAGE_NAME.equals(processName) || !pendingManager)
             return false;
         pendingManager = false;
         managerPid = pid;
-        Log.d(TAG, "starting injected manager: pid = " + pid + " uid = " + uid + " processName = " + processName);
+        logDebug("shouldStartManager", "starting injected manager: pid = " + pid + " uid = " + uid + " processName = " + processName);
         return true;
     }
 
     synchronized boolean setEnabled(boolean newValue) {
         enabled = newValue;
-        Log.i(TAG, "manager enabled = " + enabled);
+        logDebug("setEnabled", "manager enabled = " + enabled);
         return enabled;
     }
 
-    // return true to send manager binder
     boolean postStartManager(int pid, int uid) {
         return enabled && uid == BuildConfig.MANAGER_INJECTED_UID && pid == managerPid;
     }
 
-    public @NonNull
-    IBinder obtainManagerBinder(@NonNull IBinder heartbeat, int pid, int uid) {
+    public @NonNull IBinder obtainManagerBinder(@NonNull IBinder heartbeat, int pid, int uid) {
+        if (!verifyCallingIdentity(pid, uid)) {
+            throw new SecurityException("Identity verification failed");
+        }
+        
         new ManagerGuard(heartbeat, pid, uid);
         if (uid == BuildConfig.MANAGER_INJECTED_UID)
             ensureWebViewPermission();
@@ -264,6 +304,9 @@ public class LSPManagerService extends ILSPManagerService.Stub {
 
     @Override
     public IBinder asBinder() {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "asBinder called", new Throwable("Stack trace"));
+        }
         return super.asBinder();
     }
 
@@ -299,22 +342,80 @@ public class LSPManagerService extends ILSPManagerService.Stub {
 
     @Override
     public boolean enableModule(String packageName) throws RemoteException {
-        return ConfigManager.getInstance().enableModule(packageName);
+        checkRateLimit("enableModule");
+        logDebug("enableModule", "Attempting to enable module: " + packageName);
+        
+        if (packageName == null || packageName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Package name cannot be null or empty");
+        }
+        if (!isValidPackageName(packageName)) {
+            throw new IllegalArgumentException("Invalid package name format");
+        }
+        
+        try {
+            boolean result = ConfigManager.getInstance().enableModule(packageName);
+            logDebug("enableModule", "Result for " + packageName + ": " + result);
+            return result;
+        } catch (Exception e) {
+            logError("enableModule", "Failed to enable module: " + packageName, e);
+            throw new RemoteException("Failed to enable module");
+        }
     }
 
     @Override
     public boolean setModuleScope(String packageName, List<Application> scope) throws RemoteException {
-        return ConfigManager.getInstance().setModuleScope(packageName, scope);
+        checkRateLimit("setModuleScope");
+        logDebug("setModuleScope", "Setting scope for module: " + packageName);
+        
+        if (packageName == null || packageName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Package name cannot be null or empty");
+        }
+        if (!isValidPackageName(packageName)) {
+            throw new IllegalArgumentException("Invalid package name format");
+        }
+        
+        try {
+            boolean result = ConfigManager.getInstance().setModuleScope(packageName, scope);
+            logDebug("setModuleScope", "Result for " + packageName + ": " + result);
+            return result;
+        } catch (Exception e) {
+            logError("setModuleScope", "Failed to set module scope: " + packageName, e);
+            throw new RemoteException("Failed to set module scope");
+        }
     }
 
     @Override
     public List<Application> getModuleScope(String packageName) {
+        if (packageName == null || packageName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Package name cannot be null or empty");
+        }
+        if (!isValidPackageName(packageName)) {
+            throw new IllegalArgumentException("Invalid package name format");
+        }
+        
         return ConfigManager.getInstance().getModuleScope(packageName);
     }
 
     @Override
     public boolean disableModule(String packageName) {
-        return ConfigManager.getInstance().disableModule(packageName);
+        checkRateLimit("disableModule");
+        logDebug("disableModule", "Attempting to disable module: " + packageName);
+        
+        if (packageName == null || packageName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Package name cannot be null or empty");
+        }
+        if (!isValidPackageName(packageName)) {
+            throw new IllegalArgumentException("Invalid package name format");
+        }
+        
+        try {
+            boolean result = ConfigManager.getInstance().disableModule(packageName);
+            logDebug("disableModule", "Result for " + packageName + ": " + result);
+            return result;
+        } catch (Exception e) {
+            logError("disableModule", "Failed to disable module: " + packageName, e);
+            return false;
+        }
     }
 
     @Override
@@ -345,7 +446,23 @@ public class LSPManagerService extends ILSPManagerService.Stub {
 
     @Override
     public PackageInfo getPackageInfo(String packageName, int flags, int uid) throws RemoteException {
-        return PackageService.getPackageInfo(packageName, flags, uid);
+        String cacheKey = packageName + ":" + flags + ":" + uid;
+        PackageInfo cached = packageInfoCache.get(cacheKey);
+        
+        if (cached != null && System.currentTimeMillis() - cacheLastUpdated < CACHE_EXPIRY_MS) {
+            return cached;
+        }
+        
+        PackageInfo info = PackageService.getPackageInfo(packageName, flags, uid);
+        if (info != null) {
+            packageInfoCache.put(cacheKey, info);
+            cacheLastUpdated = System.currentTimeMillis();
+        }
+        return info;
+    }
+
+    public void clearPackageInfoCache() {
+        packageInfoCache.clear();
     }
 
     @Override
@@ -368,7 +485,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
                 return false;
             }
         } catch (InterruptedException | ReflectiveOperationException e) {
-            Log.e(TAG, e.getMessage(), e);
+            logError("uninstallPackage", "Failed to uninstall package: " + packageName, e);
             return false;
         }
     }
@@ -398,7 +515,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
                 return PackageService.installExistingPackageAsUser(packageName, userId);
             else return PackageService.INSTALL_FAILED_INTERNAL_ERROR;
         } catch (Throwable e) {
-            Log.w(TAG, "install existing package as user: ", e);
+            logError("installExistingPackageAsUser", "Failed to install existing package: " + packageName, e);
             return PackageService.INSTALL_FAILED_INTERNAL_ERROR;
         }
     }
@@ -438,35 +555,58 @@ public class LSPManagerService extends ILSPManagerService.Stub {
         return SystemProperties.get("dalvik.vm.dex2oat-flags").contains("--inline-max-code-units=0");
     }
 
+    private void setHiddenIconPreR(Bundle args) throws RemoteException {
+        var contentProvider = ActivityManagerService.getContentProvider("settings", 0);
+        if (contentProvider != null) {
+            contentProvider.call("android", "settings", "PUT_global", "show_hidden_icon_apps_enabled", args);
+        }
+    }
+
+    private void setHiddenIconR(Bundle args) throws RemoteException {
+        var contentProvider = ActivityManagerService.getContentProvider("settings", 0);
+        if (contentProvider != null) {
+            contentProvider.call("android", null, "settings", "PUT_global", "show_hidden_icon_apps_enabled", args);
+        }
+    }
+
+    private void setHiddenIconS(AttributionSource attributionSource, Bundle args) throws RemoteException {
+        var contentProvider = ActivityManagerService.getContentProvider("settings", 0);
+        if (contentProvider != null) {
+            contentProvider.call(attributionSource, "settings", "PUT_global", "show_hidden_icon_apps_enabled", args);
+        }
+    }
+
     @Override
     public void setHiddenIcon(boolean hide) {
         Bundle args = new Bundle();
         args.putString("value", hide ? "0" : "1");
         args.putString("_user", "0");
+        
         try {
-            var contentProvider = ActivityManagerService.getContentProvider("settings", 0);
-            if (contentProvider != null) {
-                try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        contentProvider.call(new AttributionSource.Builder(1000).setPackageName("android").build(),
-                                "settings", "PUT_global", "show_hidden_icon_apps_enabled", args);
-                    } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
-                        contentProvider.call("android", null, "settings", "PUT_global", "show_hidden_icon_apps_enabled", args);
-                    } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
-                        contentProvider.call("android", "settings", "PUT_global", "show_hidden_icon_apps_enabled", args);
-                    }
-                } catch (NoSuchMethodError e) {
-                    Log.w(TAG, "setHiddenIcon: ", e);
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AttributionSource attributionSource = new AttributionSource.Builder(1000)
+                    .setPackageName("android")
+                    .build();
+                setHiddenIconS(attributionSource, args);
+            } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
+                setHiddenIconR(args);
+            } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
+                setHiddenIconPreR(args);
             }
         } catch (Throwable e) {
-            Log.w(TAG, "setHiddenIcon: ", e);
+            logError("setHiddenIcon", "Failed to set hidden icon", e);
         }
     }
 
     @Override
     public void getLogs(ParcelFileDescriptor zipFd) {
-        ConfigFileManager.getLogs(zipFd);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try (zipFd) {
+                ConfigFileManager.getLogs(zipFd);
+            } catch (Exception e) {
+                logError("getLogs", "Error getting logs", e);
+            }
+        });
     }
 
     @Override
@@ -480,27 +620,44 @@ public class LSPManagerService extends ILSPManagerService.Stub {
 
     @Override
     public void flashZip(String zipPath, ParcelFileDescriptor outputStream) {
-        var processBuilder = new ProcessBuilder("magisk", "--install-module", zipPath);
-        var fd = new File("/proc/self/fd/" + outputStream.getFd());
-        processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(fd));
-        try (outputStream; var fdw = new FileOutputStream(fd, true)) {
-            var proc = processBuilder.start();
-            if (proc.waitFor(10, TimeUnit.SECONDS)) {
-                var exit = proc.exitValue();
+        Process process = null;
+        FileOutputStream fdw = null;
+        
+        try (outputStream) {
+            var processBuilder = new ProcessBuilder("magisk", "--install-module", zipPath);
+            var fd = new File("/proc/self/fd/" + outputStream.getFd());
+            processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(fd));
+            
+            fdw = new FileOutputStream(fd, true);
+            process = processBuilder.start();
+            
+            if (process.waitFor(10, TimeUnit.SECONDS)) {
+                int exit = process.exitValue();
                 if (exit == 0) {
                     fdw.write("- Reboot after 5s\n".getBytes());
                     Thread.sleep(5000);
                     reboot();
                 } else {
-                    var s = "! Flash failed, exit with " + exit + "\n";
+                    String s = "! Flash failed, exit with " + exit + "\n";
                     fdw.write(s.getBytes());
                 }
             } else {
-                proc.destroy();
+                process.destroy();
                 fdw.write("! Timeout, abort\n".getBytes());
             }
         } catch (IOException | InterruptedException | RemoteException e) {
-            Log.e(TAG, "flashZip: ", e);
+            logError("flashZip", "Error flashing zip", e);
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
+            if (fdw != null) {
+                try {
+                    fdw.close();
+                } catch (IOException e) {
+                    Log.e(TAG, "Error closing FileOutputStream", e);
+                }
+            }
         }
     }
 
