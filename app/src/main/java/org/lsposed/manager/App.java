@@ -73,9 +73,9 @@ import rikka.material.app.LocaleDelegate;
 
 public class App extends Application {
     public static final int PER_USER_RANGE = 100000;
-    public static final FutureTask<String> HTML_TEMPLATE = new FutureTask<>(() -> readWebviewHTML("template.html"));
-    public static final FutureTask<String> HTML_TEMPLATE_DARK = new FutureTask<>(() -> readWebviewHTML("template_dark.html"));
-
+    public static FutureTask<String> HTML_TEMPLATE;
+    public static FutureTask<String> HTML_TEMPLATE_DARK;
+    
     private static String readWebviewHTML(String name) {
         try {
             var input = App.getInstance().getAssets().open("webview/" + name);
@@ -83,29 +83,9 @@ public class App extends Application {
             FileUtils.copy(input, result);
             return result.toString(StandardCharsets.UTF_8.name());
         } catch (IOException e) {
-            Log.e(App.TAG, "read webview HTML", e);
+            Log.e(App.TAG, "Failed to read webview HTML", e);
             return "<html dir\"@dir@\"><body>@body@</body></html>";
         }
-    }
-
-    static {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            HiddenApiBypass.addHiddenApiExemptions("");
-        }
-        Looper.myQueue().addIdleHandler(() -> {
-            if (App.getInstance() == null || App.getExecutorService() == null) return true;
-            App.getExecutorService().submit(() -> {
-                var list = AppHelper.getAppList(false);
-                var pm = App.getInstance().getPackageManager();
-                list.parallelStream().forEach(i -> AppHelper.getAppLabel(i, pm));
-                AppHelper.getDenyList(false);
-                ModuleUtil.getInstance();
-                RepoLoader.getInstance();
-            });
-            App.getExecutorService().submit(HTML_TEMPLATE);
-            App.getExecutorService().submit(HTML_TEMPLATE_DARK);
-            return false;
-        });
     }
 
     public static final String TAG = "LSPosedManager";
@@ -165,16 +145,19 @@ public class App extends Application {
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
             var time = OffsetDateTime.now();
             var dir = new File(getCacheDir(), "crash");
-            //noinspection ResultOfMethodCallIgnored
-            dir.mkdir();
+            if (!dir.exists() && !dir.mkdirs()) {
+                Log.e(TAG, "Failed to create crash directory");
+            }
             var file = new File(dir, time.toEpochSecond() + ".log");
             try (var pw = new PrintWriter(file)) {
                 pw.println(BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")");
                 pw.println(time);
                 pw.println("pid: " + Os.getpid() + " uid: " + Os.getuid());
                 throwable.printStackTrace(pw);
-            } catch (IOException ignored) {
+            } catch (IOException e) {
+                Log.e(TAG, "Failed to write crash log", e);
             }
+            
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 var table = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
                 var values = new ContentValues();
@@ -182,11 +165,19 @@ public class App extends Application {
                 values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOCUMENTS);
                 var cr = getContentResolver();
                 var uri = cr.insert(table, values);
-                if (uri == null) return;
+                if (uri == null) {
+                    Log.e(TAG, "Failed to create crash report content URI");
+                    return;
+                }
                 try (var zipFd = cr.openFileDescriptor(uri, "wt")) {
                     LSPManagerServiceHolder.getService().getLogs(zipFd);
-                } catch (Exception ignored) {
-                    cr.delete(uri, null, null);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to write crash report", e);
+                    try {
+                        cr.delete(uri, null, null);
+                    } catch (Exception ex) {
+                        Log.e(TAG, "Failed to delete crash report URI", ex);
+                    }
                 }
             }
             if (handler != null) {
@@ -199,6 +190,10 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         instance = this;
+
+        // Initialize webview HTML templates
+        HTML_TEMPLATE = new FutureTask<>(() -> readWebviewHTML("template.html"));
+        HTML_TEMPLATE_DARK = new FutureTask<>(() -> readWebviewHTML("template_dark.html"));
 
         setCrashReport();
         pref = PreferenceManager.getDefaultSharedPreferences(this);
@@ -218,31 +213,71 @@ public class App extends Application {
         //noinspection deprecation
         res.updateConfiguration(config, res.getDisplayMetrics());
 
+        // Initialize background tasks
+        getExecutorService().submit(() -> {
+            var list = AppHelper.getAppList(false);
+            var pm = App.getInstance().getPackageManager();
+            list.parallelStream().forEach(i -> AppHelper.getAppLabel(i, pm));
+            AppHelper.getDenyList(false);
+            ModuleUtil.getInstance();
+            RepoLoader.getInstance();
+        });
+        getExecutorService().submit(HTML_TEMPLATE);
+        getExecutorService().submit(HTML_TEMPLATE_DARK);
+
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction("org.lsposed.manager.NOTIFICATION");
-        registerReceiver(new BroadcastReceiver() {
+        
+        BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent inIntent) {
-                var intent = (Intent) inIntent.getParcelableExtra(Intent.EXTRA_INTENT);
-                Log.d(TAG, "onReceive: " + intent);
-                switch (intent.getAction()) {
-                    case Intent.ACTION_PACKAGE_ADDED, Intent.ACTION_PACKAGE_CHANGED, Intent.ACTION_PACKAGE_FULLY_REMOVED, Intent.ACTION_UID_REMOVED -> {
-                        var userId = intent.getIntExtra(Intent.EXTRA_USER, 0);
-                        var packageName = intent.getStringExtra("android.intent.extra.PACKAGES");
-                        var packageRemovedForAllUsers = intent.getBooleanExtra(EXTRA_REMOVED_FOR_ALL_USERS, false);
-                        var isXposedModule = intent.getBooleanExtra("isXposedModule", false);
-                        if (packageName != null) {
-                            if (isXposedModule)
-                                ModuleUtil.getInstance().reloadSingleModule(packageName, userId, packageRemovedForAllUsers);
-                            else
-                                App.getExecutorService().submit(() -> AppHelper.getAppList(true));
-                        }
+                Intent intent = inIntent.getParcelableExtra(Intent.EXTRA_INTENT);
+                if (intent == null) {
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "Received notification without EXTRA_INTENT");
                     }
-                    case ACTION_USER_ADDED, ACTION_USER_REMOVED, ACTION_USER_INFO_CHANGED -> App.getExecutorService().submit(() -> ModuleUtil.getInstance().reloadInstalledModules());
+                    return;
+                }
+                
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "onReceive: " + intent);
+                }
+                
+                String action = intent.getAction();
+                if (action == null) return;
+                
+                int userId = intent.getIntExtra(Intent.EXTRA_USER, 0);
+                String packageName = intent.getStringExtra(Intent.EXTRA_PACKAGES);
+                boolean packageRemovedForAllUsers = intent.getBooleanExtra(EXTRA_REMOVED_FOR_ALL_USERS, false);
+                boolean isXposedModule = intent.getBooleanExtra("isXposedModule", false);
+                
+                switch (action) {
+                    case Intent.ACTION_PACKAGE_ADDED:
+                    case Intent.ACTION_PACKAGE_CHANGED:
+                    case Intent.ACTION_PACKAGE_FULLY_REMOVED:
+                    case Intent.ACTION_UID_REMOVED:
+                        if (packageName != null) {
+                            if (isXposedModule) {
+                                ModuleUtil.getInstance().reloadSingleModule(packageName, userId, packageRemovedForAllUsers);
+                            } else {
+                                App.getExecutorService().submit(() -> AppHelper.getAppList(true));
+                            }
+                        }
+                        break;
+                    case ACTION_USER_ADDED:
+                    case ACTION_USER_REMOVED:
+                    case ACTION_USER_INFO_CHANGED:
+                        App.getExecutorService().submit(() -> ModuleUtil.getInstance().reloadInstalledModules());
+                        break;
                 }
             }
-            //TODO FIXME
-        }, intentFilter, Context.RECEIVER_NOT_EXPORTED);
+        };
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, intentFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(receiver, intentFilter);
+        }
 
         UpdateUtil.loadRemoteVersion();
     }
@@ -254,7 +289,11 @@ public class App extends Application {
             .cache(getOkHttpCache())
             .dns(new CloudflareDNS());
         if (BuildConfig.DEBUG) {
-            var log = new HttpLoggingInterceptor();
+            var log = new HttpLoggingInterceptor(message -> {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, message);
+                }
+            });
             log.setLevel(HttpLoggingInterceptor.Level.HEADERS);
             builder.addInterceptor(log);
         }
