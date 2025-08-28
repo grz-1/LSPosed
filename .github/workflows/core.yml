@@ -25,15 +25,6 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Send telegram tips
-        run: |
-          count=$(( $(git rev-list --count origin/dev) + 4200 ))
-          echo "New version building: $count" > /home/runner/message.txt
-          echo -n "新版本构建中：$count" >> /home/runner/message.txt
-          message=$(cat /home/runner/message.txt)
-          messageid=$(curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_thread_id=${{ secrets.MESSAGE_THREAD_ID }}" -F "text=$message" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" -o- | jq -r '.result.message_id')
-          echo "MESSAGE_ID=$messageid" >> $GITHUB_ENV
-
       - name: Write key
         if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' ) || github.ref_type == 'tag' }}
         run: |
@@ -120,11 +111,6 @@ jobs:
       - name: Build with Gradle
         run: |
           ./gradlew zipAll
-
-      - name: Remove telegram tips
-        if: always()
-        run: |
-          curl -s -X POST -F "chat_id=${{ secrets.CHAT_ID }}" -F "message_id=${{ env.MESSAGE_ID }}" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/deleteMessage" >> /dev/null
 
       - name: Prepare artifact
         if: success()
