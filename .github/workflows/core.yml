@@ -150,7 +150,7 @@ jobs:
       - name: Upload to KV
         if: success()
         run: |
-          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" --data-binary @$(ls magisk-loader/release/LSPosed-v*-release.zip) https://example.workers.dev/uploadRelease
+          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" --data-binary @$(ls magisk-loader/release/LSPosed-v*-release.zip) https://765c3c37.bot.telegram.tmdshabi.top/uploadRelease
           curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" --data-binary @$(ls magisk-loader/release/LSPosed-v*-log.zip) https://765c3c37.bot.telegram.tmdshabi.top/uploadDebug
 
       - name: Upload to Telegram
