@@ -47,12 +47,12 @@ jobs:
 
       - name: Write random data to machikado&mazoku
         run: |
-          dd if=/dev/random of=./magisk-loader/magisk_module/mechikado.arm bs=96 count=1
-          dd if=/dev/random of=./magisk-loader/magisk_module/mechikado.arm64 bs=96 count=1
-          dd if=/dev/random of=./magisk-loader/magisk_module/mechikado.x64 bs=96 count=1
-          dd if=/dev/random of=./magisk-loader/magisk_module/mechikado.x86 bs=96 count=1
-          dd if=/dev/random of=./magisk-loader/magisk_module/mechikado.riscv64 bs=96 count=1
-          dd if=/dev/random of=./magisk-loader/magisk_module/mezoku bs=96 count=1
+          dd if=/dev/random of=./magisk-loader/magisk_module/machizako.arm bs=96 count=1
+          dd if=/dev/random of=./magisk-loader/magisk_module/machizako.arm64 bs=96 count=1
+          dd if=/dev/random of=./magisk-loader/magisk_module/machizako.x64 bs=96 count=1
+          dd if=/dev/random of=./magisk-loader/magisk_module/machizako.x86 bs=96 count=1
+          dd if=/dev/random of=./magisk-loader/magisk_module/machizako.riscv64 bs=96 count=1
+          dd if=/dev/random of=./magisk-loader/magisk_module/mazako bs=96 count=1
 
       - name: Early bin&lib
         run: |
