@@ -36,7 +36,8 @@ import androidx.navigation.Navigation;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.NavigationUI;
 
-import com.google.android.material.navigation.NavigationBarView;
+import com.google.android.material.badge.BadgeDrawable;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import org.lsposed.manager.App;
 import org.lsposed.manager.ConfigManager;
@@ -70,14 +71,15 @@ public class MainActivity extends BaseActivity
     }
 
     @NonNull
-    private static Intent newIntent(@NonNull Bundle savedState,
-                                    @NonNull Context context) {
+    private static Intent newIntent(
+            @NonNull Bundle savedState,
+            @NonNull Context context) {
         return newIntent(context)
                 .putExtra(EXTRA_SAVED_INSTANCE_STATE, savedState);
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    public void onCreate(Bundle savedInstanceState) {
         if (savedInstanceState == null) {
             savedInstanceState = getIntent()
                     .getBundleExtra(EXTRA_SAVED_INSTANCE_STATE);
@@ -95,8 +97,8 @@ public class MainActivity extends BaseActivity
                 (NavHostFragment) getSupportFragmentManager()
                         .findFragmentById(R.id.nav_host_fragment);
         if (navHostFragment != null) {
+            BottomNavigationView nav = binding.nav;
             NavController navController = navHostFragment.getNavController();
-            NavigationBarView nav = binding.nav;
             NavigationUI.setupWithNavController(nav, navController);
             handleIntent(getIntent());
         }
@@ -116,8 +118,8 @@ public class MainActivity extends BaseActivity
                         .findFragmentById(R.id.nav_host_fragment);
         if (navHostFragment == null) return;
 
+        BottomNavigationView nav = binding.nav;
         NavController navController = navHostFragment.getNavController();
-        NavigationBarView nav = binding.nav;
 
         if ("android.intent.action.APPLICATION_PREFERENCES"
                 .equals(intent.getAction())) {
@@ -159,7 +161,6 @@ public class MainActivity extends BaseActivity
                                     "moduleUserId",
                                     String.valueOf(data.getPort()))
                             .build();
-
                     NavOptions opts = new NavOptions.Builder()
                             .setEnterAnim(R.anim.fragment_enter)
                             .setExitAnim(R.anim.fragment_exit)
@@ -171,7 +172,6 @@ public class MainActivity extends BaseActivity
                                              .getStartDestinationId(),
                                 false, true)
                             .build();
-
                     navController.navigate(target, opts);
                 }
         }
@@ -224,26 +224,24 @@ public class MainActivity extends BaseActivity
     }
 
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
 
-        if (ConfigManager.isBinderAlive()) {
-            setModulesSummary(moduleUtil.getEnabledModulesCount());
-        } else {
-            setModulesSummary(0);
-        }
+        int enabledCount = ConfigManager.isBinderAlive()
+                ? moduleUtil.getEnabledModulesCount() : 0;
+        setModulesBadge(enabledCount);
 
+        BottomNavigationView nav = binding.nav;
         if (UpdateUtil.needUpdate()) {
-            var badge = binding.nav.getOrCreateBadge(R.id.main_fragment);
-            badge.setVisible(true);
+            BadgeDrawable mainBadge = nav.getOrCreateBadge(R.id.main_fragment);
+            mainBadge.setVisible(true);
         }
 
         if (!ConfigManager.isBinderAlive()) {
-            var menu = binding.nav.getMenu();
-            menu.removeItem(R.id.logs_fragment);
-            menu.removeItem(R.id.modules_nav);
+            nav.getMenu().removeItem(R.id.logs_fragment);
+            nav.getMenu().removeItem(R.id.modules_nav);
             if (!ConfigManager.isMagiskInstalled()) {
-                menu.removeItem(R.id.repo_nav);
+                nav.getMenu().removeItem(R.id.repo_nav);
             }
         }
     }
@@ -263,52 +261,20 @@ public class MainActivity extends BaseActivity
                 if (!seen.contains(key.first)) {
                     var latest = repoLoader.getModuleLatestVersion(key.first);
                     if (latest != null &&
-                        latest.upgradable(info.versionCode,
-                                         info.versionName)) {
+                        latest.upgradable(info.versionCode, info.versionName)) {
                         count[0]++;
                     }
                     seen.add(key.first);
                 }
             });
         }
+
         runOnUiThread(() -> {
+            BottomNavigationView nav = binding.nav;
+            BadgeDrawable badge = nav.getOrCreateBadge(R.id.repo_nav);
             if (count[0] > 0) {
-                var badge = binding.nav.getOrCreateBadge(R.id.repo_nav);
                 badge.setVisible(true);
                 badge.setNumber(count[0]);
-            } else {
-                onThrowable(null);
-            }
-        });
-    }
-
-    @Override
-    public void onThrowable(Throwable t) {
-        runOnUiThread(() -> {
-            var badge = binding.nav.getOrCreateBadge(R.id.repo_nav);
-            badge.setVisible(false);
-        });
-    }
-
-    @Override
-    public void onModulesReloaded() {
-        onRepoLoaded();
-        setModulesSummary(moduleUtil.getEnabledModulesCount());
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        repoLoader.removeListener(this);
-        moduleUtil.removeListener(this);
-    }
-
-    private void setModulesSummary(int moduleCount) {
-        runOnUiThread(() -> {
-            var badge = binding.nav.getOrCreateBadge(R.id.modules_nav);
-            if (moduleCount > 0) {
-                badge.setVisible(true);
-                badge.setNumber(moduleCount);
             } else {
                 badge.setVisible(false);
             }
@@ -316,9 +282,42 @@ public class MainActivity extends BaseActivity
     }
 
     @Override
+    public void onThrowable(Throwable t) {
+        runOnUiThread(() -> {
+            BottomNavigationView nav = binding.nav;
+            BadgeDrawable badge = nav.getOrCreateBadge(R.id.repo_nav);
+            badge.setVisible(false);
+        });
+    }
+
+    @Override
+    public void onModulesReloaded() {
+        onRepoLoaded();
+        setModulesBadge(moduleUtil.getEnabledModulesCount());
+    }
+
+    @Override
     public boolean onSupportNavigateUp() {
         NavController navController = Navigation.findNavController(
                 this, R.id.nav_host_fragment);
         return navController.navigateUp() || super.onSupportNavigateUp();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        repoLoader.removeListener(this);
+        moduleUtil.removeListener(this);
+    }
+
+    private void setModulesBadge(int count) {
+        BottomNavigationView nav = binding.nav;
+        BadgeDrawable badge = nav.getOrCreateBadge(R.id.modules_nav);
+        if (count > 0) {
+            badge.setVisible(true);
+            badge.setNumber(count);
+        } else {
+            badge.setVisible(false);
+        }
     }
 }
