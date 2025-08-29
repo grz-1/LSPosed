@@ -50,11 +50,13 @@ import org.lsposed.manager.util.UpdateUtil;
 import java.util.HashSet;
 import java.util.Objects;
 
-import rikka.core.util.ResourceUtils;
+public class MainActivity extends BaseActivity
+        implements RepoLoader.RepoListener, ModuleUtil.ModuleListener {
 
-public class MainActivity extends BaseActivity implements RepoLoader.RepoListener, ModuleUtil.ModuleListener {
-    private static final String KEY_PREFIX = MainActivity.class.getName() + '.';
-    private static final String EXTRA_SAVED_INSTANCE_STATE = KEY_PREFIX + "SAVED_INSTANCE_STATE";
+    private static final String KEY_PREFIX
+            = MainActivity.class.getName() + '.';
+    private static final String EXTRA_SAVED_INSTANCE_STATE
+            = KEY_PREFIX + "SAVED_INSTANCE_STATE";
 
     private static final RepoLoader repoLoader = RepoLoader.getInstance();
     private static final ModuleUtil moduleUtil = ModuleUtil.getInstance();
@@ -68,15 +70,17 @@ public class MainActivity extends BaseActivity implements RepoLoader.RepoListene
     }
 
     @NonNull
-    private static Intent newIntent(@NonNull Bundle savedInstanceState, @NonNull Context context) {
+    private static Intent newIntent(@NonNull Bundle savedState,
+                                    @NonNull Context context) {
         return newIntent(context)
-                .putExtra(EXTRA_SAVED_INSTANCE_STATE, savedInstanceState);
+                .putExtra(EXTRA_SAVED_INSTANCE_STATE, savedState);
     }
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         if (savedInstanceState == null) {
-            savedInstanceState = getIntent().getBundleExtra(EXTRA_SAVED_INSTANCE_STATE);
+            savedInstanceState = getIntent()
+                    .getBundleExtra(EXTRA_SAVED_INSTANCE_STATE);
         }
         super.onCreate(savedInstanceState);
 
@@ -85,19 +89,17 @@ public class MainActivity extends BaseActivity implements RepoLoader.RepoListene
 
         repoLoader.addListener(this);
         moduleUtil.addListener(this);
-
         onModulesReloaded();
 
-        NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment);
-        if (navHostFragment == null) {
-            return;
+        NavHostFragment navHostFragment =
+                (NavHostFragment) getSupportFragmentManager()
+                        .findFragmentById(R.id.nav_host_fragment);
+        if (navHostFragment != null) {
+            NavController navController = navHostFragment.getNavController();
+            NavigationBarView nav = binding.nav;
+            NavigationUI.setupWithNavController(nav, navController);
+            handleIntent(getIntent());
         }
-
-        NavController navController = navHostFragment.getNavController();
-        var nav = (NavigationBarView) binding.nav;
-        NavigationUI.setupWithNavController(nav, navController);
-
-        handleIntent(getIntent());
     }
 
     @Override
@@ -107,111 +109,171 @@ public class MainActivity extends BaseActivity implements RepoLoader.RepoListene
     }
 
     private void handleIntent(Intent intent) {
-        if (intent == null) {
-            return;
-        }
-        NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment);
-        if (navHostFragment == null) {
-            return;
-        }
-        NavController navController = navHostFragment.getNavController();
-        var nav = (NavigationBarView) binding.nav;
-        if (intent.getAction() != null && intent.getAction().equals("android.intent.action.APPLICATION_PREFERENCES")) {
-            nav.setSelectedItemId(R.id.settings_fragment);
-        } else if (ConfigManager.isBinderAlive()) {
-            if (!TextUtils.isEmpty(intent.getDataString())) {
-                switch (intent.getDataString()) {
-                    case "modules" -> nav.setSelectedItemId(R.id.modules_nav);
-                    case "logs" -> nav.setSelectedItemId(R.id.logs_fragment);
-                    case "repo" -> {
-                        if (ConfigManager.isMagiskInstalled()) {
-                            nav.setSelectedItemId(R.id.repo_nav);
-                        }
-                    }
-                    case "settings" -> nav.setSelectedItemId(R.id.settings_fragment);
-                    default -> {
-                        var data = intent.getData();
-                        if (data != null && Objects.equals(data.getScheme(), "module")) {
-                            navController.navigate(
-                                    new Uri.Builder().scheme("lsposed").authority("module").appendQueryParameter("modulePackageName", data.getHost()).appendQueryParameter("moduleUserId", String.valueOf(data.getPort())).build(),
-                                    new NavOptions.Builder().setEnterAnim(R.anim.fragment_enter).setExitAnim(R.anim.fragment_exit).setPopEnterAnim(R.anim.fragment_enter_pop).setPopExitAnim(R.anim.fragment_exit_pop).setLaunchSingleTop(true).setPopUpTo(navController.getGraph().getStartDestinationId(), false, true).build());
-                        }
-                    }
-                }
-            }
-        }
-    }
+        if (intent == null) return;
 
-    @Override
-    public boolean onSupportNavigateUp() {
-        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment);
-        return navController.navigateUp() || super.onSupportNavigateUp();
+        NavHostFragment navHostFragment =
+                (NavHostFragment) getSupportFragmentManager()
+                        .findFragmentById(R.id.nav_host_fragment);
+        if (navHostFragment == null) return;
+
+        NavController navController = navHostFragment.getNavController();
+        NavigationBarView nav = binding.nav;
+
+        if ("android.intent.action.APPLICATION_PREFERENCES"
+                .equals(intent.getAction())) {
+            nav.setSelectedItemId(R.id.settings_fragment);
+            return;
+        }
+
+        if (!ConfigManager.isBinderAlive()
+                || TextUtils.isEmpty(intent.getDataString())) {
+            return;
+        }
+
+        String dataString = intent.getDataString();
+        switch (dataString) {
+            case "modules":
+                nav.setSelectedItemId(R.id.modules_nav);
+                return;
+            case "logs":
+                nav.setSelectedItemId(R.id.logs_fragment);
+                return;
+            case "repo":
+                if (ConfigManager.isMagiskInstalled()) {
+                    nav.setSelectedItemId(R.id.repo_nav);
+                }
+                return;
+            case "settings":
+                nav.setSelectedItemId(R.id.settings_fragment);
+                return;
+            default:
+                Uri data = intent.getData();
+                if (data != null && "module".equals(data.getScheme())) {
+                    Uri target = new Uri.Builder()
+                            .scheme("lsposed")
+                            .authority("module")
+                            .appendQueryParameter(
+                                    "modulePackageName",
+                                    data.getHost())
+                            .appendQueryParameter(
+                                    "moduleUserId",
+                                    String.valueOf(data.getPort()))
+                            .build();
+
+                    NavOptions opts = new NavOptions.Builder()
+                            .setEnterAnim(R.anim.fragment_enter)
+                            .setExitAnim(R.anim.fragment_exit)
+                            .setPopEnterAnim(R.anim.fragment_enter_pop)
+                            .setPopExitAnim(R.anim.fragment_exit_pop)
+                            .setLaunchSingleTop(true)
+                            .setPopUpTo(
+                                navController.getGraph()
+                                             .getStartDestinationId(),
+                                false, true)
+                            .build();
+
+                    navController.navigate(target, opts);
+                }
+        }
     }
 
     public void restart() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || App.isParasitic) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                || App.isParasitic) {
             recreate();
-        } else {
-            try {
-                Bundle savedInstanceState = new Bundle();
-                onSaveInstanceState(savedInstanceState);
-                finish();
-                startActivity(newIntent(savedInstanceState, this));
-                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-                restarting = true;
-            } catch (Throwable e) {
-                recreate();
-            }
+            return;
+        }
+        try {
+            Bundle state = new Bundle();
+            onSaveInstanceState(state);
+            finish();
+            startActivity(newIntent(state, this));
+            overridePendingTransition(
+                    android.R.anim.fade_in,
+                    android.R.anim.fade_out);
+            restarting = true;
+        } catch (Throwable e) {
+            recreate();
         }
     }
 
     @Override
-    public boolean dispatchKeyEvent(@NonNull KeyEvent event) {
+    public boolean dispatchKeyEvent(KeyEvent event) {
         return restarting || super.dispatchKeyEvent(event);
     }
 
     @SuppressLint("RestrictedApi")
     @Override
-    public boolean dispatchKeyShortcutEvent(@NonNull KeyEvent event) {
+    public boolean dispatchKeyShortcutEvent(KeyEvent event) {
         return restarting || super.dispatchKeyShortcutEvent(event);
     }
 
     @Override
-    public boolean dispatchTouchEvent(@NonNull MotionEvent event) {
-        return restarting || super.dispatchTouchEvent(event);
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        return restarting || super.dispatchTouchEvent(ev);
     }
 
     @Override
-    public boolean dispatchTrackballEvent(@NonNull MotionEvent event) {
-        return restarting || super.dispatchTrackballEvent(event);
+    public boolean dispatchTrackballEvent(MotionEvent ev) {
+        return restarting || super.dispatchTrackballEvent(ev);
     }
 
     @Override
-    public boolean dispatchGenericMotionEvent(@NonNull MotionEvent event) {
-        return restarting || super.dispatchGenericMotionEvent(event);
+    public boolean dispatchGenericMotionEvent(MotionEvent ev) {
+        return restarting || super.dispatchGenericMotionEvent(ev);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (ConfigManager.isBinderAlive()) {
+            setModulesSummary(moduleUtil.getEnabledModulesCount());
+        } else {
+            setModulesSummary(0);
+        }
+
+        if (UpdateUtil.needUpdate()) {
+            var badge = binding.nav.getOrCreateBadge(R.id.main_fragment);
+            badge.setVisible(true);
+        }
+
+        if (!ConfigManager.isBinderAlive()) {
+            var menu = binding.nav.getMenu();
+            menu.removeItem(R.id.logs_fragment);
+            menu.removeItem(R.id.modules_nav);
+            if (!ConfigManager.isMagiskInstalled()) {
+                menu.removeItem(R.id.repo_nav);
+            }
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+    }
 
     @Override
     public void onRepoLoaded() {
-        final int[] count = new int[]{0};
-        HashSet<String> processedModules = new HashSet<>();
+        final int[] count = {0};
         var modules = moduleUtil.getModules();
-        if (modules == null) return;
-        modules.forEach((k, v) -> {
-                    if (!processedModules.contains(k.first)) {
-                        var ver = repoLoader.getModuleLatestVersion(k.first);
-                        if (ver != null && ver.upgradable(v.versionCode, v.versionName)) {
-                            ++count[0];
-                        }
-                        processedModules.add(k.first);
+        if (modules != null) {
+            HashSet<String> seen = new HashSet<>();
+            modules.forEach((key, info) -> {
+                if (!seen.contains(key.first)) {
+                    var latest = repoLoader.getModuleLatestVersion(key.first);
+                    if (latest != null &&
+                        latest.upgradable(info.versionCode,
+                                         info.versionName)) {
+                        count[0]++;
                     }
+                    seen.add(key.first);
                 }
-        );
+            });
+        }
         runOnUiThread(() -> {
-            if (count[0] > 0 && binding != null) {
-                var nav = (NavigationBarView) binding.nav;
-                var badge = nav.getOrCreateBadge(R.id.repo_nav);
+            if (count[0] > 0) {
+                var badge = binding.nav.getOrCreateBadge(R.id.repo_nav);
                 badge.setVisible(true);
                 badge.setNumber(count[0]);
             } else {
@@ -223,11 +285,8 @@ public class MainActivity extends BaseActivity implements RepoLoader.RepoListene
     @Override
     public void onThrowable(Throwable t) {
         runOnUiThread(() -> {
-            if (binding != null) {
-                var nav = (NavigationBarView) binding.nav;
-                var badge = nav.getOrCreateBadge(R.id.repo_nav);
-                badge.setVisible(false);
-            }
+            var badge = binding.nav.getOrCreateBadge(R.id.repo_nav);
+            badge.setVisible(false);
         });
     }
 
@@ -238,49 +297,28 @@ public class MainActivity extends BaseActivity implements RepoLoader.RepoListene
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        if (ConfigManager.isBinderAlive()) {
-            setModulesSummary(moduleUtil.getEnabledModulesCount());
-        } else setModulesSummary(0);
-        if (binding != null) {
-            var nav = (NavigationBarView) binding.nav;
-            if (UpdateUtil.needUpdate()) {
-                var badge = nav.getOrCreateBadge(R.id.main_fragment);
-                badge.setVisible(true);
-            }
-
-            if (!ConfigManager.isBinderAlive()) {
-                nav.getMenu().removeItem(R.id.logs_fragment);
-                nav.getMenu().removeItem(R.id.modules_nav);
-                if (!ConfigManager.isMagiskInstalled()) {
-                    nav.getMenu().removeItem(R.id.repo_nav);
-                }
-            }
-        }
+    protected void onDestroy() {
+        super.onDestroy();
+        repoLoader.removeListener(this);
+        moduleUtil.removeListener(this);
     }
 
     private void setModulesSummary(int moduleCount) {
         runOnUiThread(() -> {
-            if (binding != null) {
-                var nav = (NavigationBarView) binding.nav;
-                var badge = nav.getOrCreateBadge(R.id.modules_nav);
-                badge.setBackgroundColor(ResourceUtils.resolveColor(getTheme(), com.google.android.material.R.attr.colorPrimary));
-                badge.setBadgeTextColor(ResourceUtils.resolveColor(getTheme(), com.google.android.material.R.attr.colorOnPrimary));
-                if (moduleCount > 0) {
-                    badge.setVisible(true);
-                    badge.setNumber(moduleCount);
-                } else {
-                    badge.setVisible(false);
-                }
+            var badge = binding.nav.getOrCreateBadge(R.id.modules_nav);
+            if (moduleCount > 0) {
+                badge.setVisible(true);
+                badge.setNumber(moduleCount);
+            } else {
+                badge.setVisible(false);
             }
         });
     }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        repoLoader.removeListener(this);
-        moduleUtil.removeListener(this);
+    public boolean onSupportNavigateUp() {
+        NavController navController = Navigation.findNavController(
+                this, R.id.nav_host_fragment);
+        return navController.navigateUp() || super.onSupportNavigateUp();
     }
 }
