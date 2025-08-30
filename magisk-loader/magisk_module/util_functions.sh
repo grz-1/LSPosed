@@ -19,12 +19,14 @@
 #
 
 check_magisk_version() {
+if [ ! "$KSU" ]; then
   ui_print "- Magisk version: $MAGISK_VER_CODE"
   if [ "$MAGISK_VER_CODE" -lt 27000 ]; then
     ui_print "*********************************************************"
     ui_print "! Please install Magisk v27+"
     abort    "*********************************************************"
   fi
+fi
 }
 
 require_new_android() {
