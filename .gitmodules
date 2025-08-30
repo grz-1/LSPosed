@@ -22,6 +22,3 @@
 [submodule "libxposed/service/service"]
 	path = libxposed/service/service
 	url = https://github.com/libxposed/service.git
-[submodule "external/lsplt"]
-	path = external/lsplt
-	url = https://github.com/PKQandBaaad/LSPlt
