@@ -152,7 +152,7 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
     val variantLowered = variant.name.lowercase()
     val buildTypeCapped = variant.buildType.name.replaceFirstChar { it.uppercase() }
     val buildTypeLowered = if (variant.buildType.name.lowercase() == "debug") {
-        "log"
+        "release-log"
     } else {
         "release"
     }
