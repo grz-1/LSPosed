@@ -37,20 +37,21 @@ Java_org_lsposed_lspd_service_Dex2OatService_doMountNative(JNIEnv *env, jobject,
     realpath("bin/dex2oat32", dex2oat32);
     realpath("bin/dex2oat64", dex2oat64);
 
-    if (pid_t pid = fork(); pid > 0) {
+    if (pid_t pid = fork(); pid > 0) { // parent
         waitpid(pid, nullptr, 0);
-    } else {
+    } else { // child
         int ns = open("/proc/1/ns/mnt", O_RDONLY);
         setns(ns, CLONE_NEWNS);
         close(ns);
 
-        const char *r32p = nullptr, *d32p = nullptr, *r64p = nullptr, *d64p = nullptr;
+        const char *r32p, *d32p, *r64p, *d64p;
         if (r32) r32p = env->GetStringUTFChars(r32, nullptr);
         if (d32) d32p = env->GetStringUTFChars(d32, nullptr);
         if (r64) r64p = env->GetStringUTFChars(r64, nullptr);
         if (d64) d64p = env->GetStringUTFChars(d64, nullptr);
 
         if (enabled) {
+            LOGI("Enable dex2oat wrapper");
             if (r32) {
                 mount(dex2oat32, r32p, nullptr, MS_BIND, nullptr);
                 mount(nullptr, r32p, nullptr, MS_BIND | MS_REMOUNT | MS_RDONLY, nullptr);
@@ -69,6 +70,7 @@ Java_org_lsposed_lspd_service_Dex2OatService_doMountNative(JNIEnv *env, jobject,
             }
             execlp("resetprop", "resetprop", "--delete", "dalvik.vm.dex2oat-flags", nullptr);
         } else {
+            LOGI("Disable dex2oat wrapper");
             if (r32) umount(r32p);
             if (d32) umount(d32p);
             if (r64) umount(r64p);
@@ -77,6 +79,7 @@ Java_org_lsposed_lspd_service_Dex2OatService_doMountNative(JNIEnv *env, jobject,
                    nullptr);
         }
 
+        PLOGE("Failed to resetprop");
         exit(1);
     }
 }
@@ -92,7 +95,7 @@ static int setsockcreatecon_raw(const char *context) {
         } while (ret < 0 && errno == EINTR);
     } else {
         do {
-            ret = write(fd, nullptr, 0);
+            ret = write(fd, nullptr, 0); // clear
         } while (ret < 0 && errno == EINTR);
     }
     close(fd);
