@@ -99,6 +99,10 @@ android {
             isMinifyEnabled = true
             proguardFiles("proguard-rules.pro")
         }
+        debug {
+            isMinifyEnabled = true
+            proguardFiles("proguard-rules.pro")
+        }
     }
 
     externalNativeBuild {
@@ -182,7 +186,7 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
             include("module.prop")
             expand(
                 "moduleId" to moduleId,
-                "versionName" to if (project.hasProperty("debugBuild")) "v${verName}-log" else "v${verName}",
+                "versionName" to if (variant.buildType.name.lowercase() == "debug") "v${verName}-log" else "v${verName}",
                 "versionCode" to verCode,
                 "authorList" to authors,
                 "updateJson" to "https://bot.lsposed.org/update/$randomUpdate/zygisk.json",

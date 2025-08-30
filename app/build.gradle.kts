@@ -67,6 +67,11 @@ android {
             isShrinkResources = true
             proguardFiles("proguard-rules.pro")
         }
+        debug {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles("proguard-rules.pro")
+        }
     }
 
     sourceSets {

@@ -48,6 +48,10 @@ android {
             isMinifyEnabled = true
             proguardFiles("proguard-rules.pro")
         }
+        debug {
+            isMinifyEnabled = true
+            proguardFiles("proguard-rules.pro")
+        }
     }
 }
 
