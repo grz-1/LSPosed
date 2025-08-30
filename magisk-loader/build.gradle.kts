@@ -26,28 +26,39 @@ import java.security.MessageDigest
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.random.Random
+import groovy.json.JsonSlurper
 
 val randomGitHubUsername: String = run {
-    for (attempt in 1..5) {
-        try {
-            val randomId = Random.nextInt(1, 190000001)
-            val url = URL("https://api.github.com/user/$randomId")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
-            if (connection.responseCode == 200) {
-                val response = connection.inputStream.bufferedReader().use { it.readText() }
-                val loginMatch = "\"login\"\\s*:\\s*\"([^\"]+)\"".toRegex().find(response)
-                if (loginMatch != null) {
-                    return@run loginMatch.groupValues[1]
-                }
-            }
-        } catch (e: Exception) {
+  val token = System.getenv("GITHUB_TOKEN").orEmpty()
+  var failCount = 0
+  while (true) {
+    try {
+      val id = Random.nextInt(1, 190000001)
+      val conn = (URL("https://api.github.com/user/$id")
+        .openConnection() as HttpURLConnection).apply {
+          requestMethod = "GET"
+          connectTimeout = 5000
+          readTimeout = 5000
+          if (token.isNotBlank()) {
+            setRequestProperty("Authorization", "token $token")
+          }
         }
-        Thread.sleep(1000)
+
+      if (conn.responseCode == 200) {
+        val data = conn.inputStream.bufferedReader().use { it.readText() }
+        val login = (JsonSlurper().parseText(data) as Map<*, *>)["login"] as? String
+        if (!login.isNullOrBlank()) {
+          return@run login
+        }
+      }
+    } catch (_: Exception) {
     }
-    "LSPosed"
+    if (++failCount >= 3) {
+      break
+    }
+    Thread.sleep(1_000)
+  }
+  "LSPosed"
 }
 
 plugins {
