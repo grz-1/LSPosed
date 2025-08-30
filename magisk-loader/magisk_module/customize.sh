@@ -53,13 +53,15 @@ do_extract false "$ZIPFILE" 'verify.sh' "$TMPDIR"
 do_extract false "$ZIPFILE" 'util_functions.sh' "$TMPDIR"
 . "$TMPDIR/util_functions.sh"
 check_android_version
-check_magisk_version
+if [ -z "$APATCH" ] && [ -z "$KSU" ]; then
+  check_magisk_version
+fi
 check_incompatible_module
 
 enforce_install_from_magisk_app
 
 # Check architecture
-if [ "$ARCH" != "arm" ] && [ "$ARCH" != "arm64" ] && [ "$ARCH" != "x86" ] && [ "$ARCH" != "x64" ]; then
+if [ "$ARCH" != "arm" ] && [ "$ARCH" != "arm64" ] && [ "$ARCH" != "x86" ] && [ "$ARCH" != "x64" ] && [ "$ARCH" != "riscv64" ]; then
   abort "! Unsupported platform: $ARCH"
 else
   ui_print "- Device platform: $ARCH"
@@ -70,7 +72,7 @@ rm -f /data/adb/lspd/manager.apk
 # Extract libs
 ui_print "- Extracting module files"
 
-extract "machizako.$ARCH" "" "machizako"
+extract "machikado.$ARCH" "" "machikado"
 
 mkdir -p "$MODPATH/zygisk"
 mkdir -p "$MODPATH/lib"
@@ -92,6 +94,9 @@ elif [ "$ARCH" = "x64" ]; then
   ABI32="x86"
   ABI64="x86_64"
   PRIMARY_ABI=$ABI64
+elif [ "$ARCH" = "riscv64" ]; then
+  ABI64="riscv64"
+  PRIMARY_ABI=$ABI64
 fi
 
 extract 'module.prop'
@@ -104,7 +109,7 @@ extract 'daemon.apk'
 extract 'daemon'
 extract 'lspd'
 extract 'manager.apk'
-extract "mazako"
+extract "mazoku"
 
 ui_print "- Extracting libraries"
 
