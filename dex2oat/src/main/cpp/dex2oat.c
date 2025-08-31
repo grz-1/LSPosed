@@ -1,26 +1,3 @@
-/*
- * This file is part of LSPosed.
- *
- * LSPosed is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * LSPosed is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with LSPosed.  If not, see <https://www.gnu.org/licenses/>.
- *
- * Copyright (C) 2022 LSPosed Contributors
- */
-
-//
-// Created by Nullptr on 2022/4/1.
-//
-
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -31,15 +8,9 @@
 
 #include "logging.h"
 
-#if defined(__LP64__)
-# define LP_SELECT(lp32, lp64) lp64
-#else
-# define LP_SELECT(lp32, lp64) lp32
-#endif
-
 #define ID_VEC(is64, is_debug) (((is64) << 1) | (is_debug))
 
-const char kSockName[] = "5291374ceda0aef7c5d86cd2a4f6a3ac\0";
+const char kSockName[] = "7d3f1a9c8e2b5f4a6c0d9e7b2a5f3c1d\0";
 
 static ssize_t xrecvmsg(int sockfd, struct msghdr *msg, int flags) {
     int rec = recvmsg(sockfd, msg, flags);
@@ -110,25 +81,27 @@ int main(int argc, char **argv) {
         PLOGE("failed to connect to %s", sock.sun_path + 1);
         return 1;
     }
-    write_int(sock_fd, ID_VEC(LP_SELECT(0, 1), strstr(argv[0], "dex2oatd") != NULL));
+    int is64bit = sizeof(void*) == 8;
+    int isDebug = strstr(argv[0], "dex2oatd") != NULL;
+    write_int(sock_fd, ID_VEC(is64bit, isDebug));
     int stock_fd = recv_fd(sock_fd);
     read_int(sock_fd);
     close(sock_fd);
     LOGD("sock: %s %d", sock.sun_path + 1, stock_fd);
 
-    const char *new_argv[argc + 2];
+    char **new_argv = malloc((argc + 1) * sizeof(char *));
     for (int i = 0; i < argc; i++) new_argv[i] = argv[i];
-    new_argv[argc] = "--inline-max-code-units=0";
-    new_argv[argc + 1] = NULL;
+    new_argv[argc] = NULL;
+
+    const char* target_path = NULL;
+    target_path = isDebug ? "/data/adb/modules/zygisk_lsposed/bin/dex2oat" : "/data/adb/modules/zygisk_lsposed/bin/dex2oat";
+    new_argv[0] = (char*)target_path;
 
     if (getenv("LD_LIBRARY_PATH") == NULL) {
-        char const *libenv =
-                "LD_LIBRARY_PATH=/apex/com.android.art/lib64:/apex/com.android.art/lib"
-                ":/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib";
-        putenv((char *)libenv);
+        setenv("LD_LIBRARY_PATH", "/apex/com.android.art/lib64:/apex/com.android.art/lib:/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib", 1);
     }
 
-    fexecve(stock_fd, (char **) new_argv, environ);
+    fexecve(stock_fd, new_argv, environ);
     PLOGE("fexecve failed");
     return 2;
 }

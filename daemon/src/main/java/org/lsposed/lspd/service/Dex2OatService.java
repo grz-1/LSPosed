@@ -1,22 +1,3 @@
-/*
- * This file is part of LSPosed.
- *
- * LSPosed is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * LSPosed is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with LSPosed.  If not, see <https://www.gnu.org/licenses/>.
- *
- * Copyright (C) 2022 LSPosed Contributors
- */
-
 package org.lsposed.lspd.service;
 
 import static org.lsposed.lspd.ILSPManagerService.DEX2OAT_CRASHED;
@@ -35,9 +16,6 @@ import android.system.Os;
 import android.system.OsConstants;
 import android.util.Log;
 
-import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
-
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.IOException;
@@ -45,14 +23,13 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 
-@RequiresApi(Build.VERSION_CODES.Q)
 public class Dex2OatService implements Runnable {
     private static final String TAG = "LSPosedDex2Oat";
-    private static final String WRAPPER32 = "bin/dex2oat";
-    private static final String WRAPPER64 = "bin/dex2oat";
+    private static final String WRAPPER32 = "bin/dex2oat32";
+    private static final String WRAPPER64 = "bin/dex2oat64";
 
-    private final String[] dex2oatArray = new String[2];
-    private final FileDescriptor[] fdArray = new FileDescriptor[2];
+    private final String[] dex2oatArray = new String[4];
+    private final FileDescriptor[] fdArray = new FileDescriptor[4];
     private final FileObserver selinuxObserver;
     private int compatibility = DEX2OAT_OK;
 
@@ -67,7 +44,6 @@ public class Dex2OatService implements Runnable {
 
     public Dex2OatService() {
         openDex2oat(0, "/data/adb/modules/zygisk_lsposed/bin/dex2oat");
-        openDex2oat(1, "/data/adb/modules/zygisk_lsposed/bin/dex2oatd");
 
         var enforce = Paths.get("/sys/fs/selinux/enforce");
         var policy = Paths.get("/sys/fs/selinux/policy");
@@ -76,8 +52,7 @@ public class Dex2OatService implements Runnable {
         list.add(policy.toFile());
         selinuxObserver = new FileObserver(list, FileObserver.CLOSE_WRITE) {
             @Override
-            public synchronized void onEvent(int i, @Nullable String s) {
-                Log.d(TAG, "SELinux status changed");
+            public synchronized void onEvent(int i, String s) {
                 if (compatibility == DEX2OAT_CRASHED) {
                     stopWatching();
                     return;
@@ -113,7 +88,6 @@ public class Dex2OatService implements Runnable {
             @Override
             public void stopWatching() {
                 super.stopWatching();
-                Log.w(TAG, "SELinux observer stopped");
             }
         };
     }
@@ -126,15 +100,12 @@ public class Dex2OatService implements Runnable {
                 var apex = Os.stat("/proc/1/root" + bin);
                 var wrapper = Os.stat(i < 2 ? WRAPPER32 : WRAPPER64);
                 if (apex.st_dev != wrapper.st_dev || apex.st_ino != wrapper.st_ino) {
-                    Log.w(TAG, "Check mount failed for " + bin);
                     return true;
                 }
             } catch (ErrnoException e) {
-                Log.e(TAG, "Check mount failed for " + bin, e);
                 return true;
             }
         }
-        Log.d(TAG, "Check mount succeeded");
         return false;
     }
 
@@ -143,7 +114,7 @@ public class Dex2OatService implements Runnable {
     }
 
     public void start() {
-        if (notMounted()) { // Already mounted when restart daemon
+        if (notMounted()) {
             doMount(true);
             if (notMounted()) {
                 doMount(false);
@@ -161,9 +132,7 @@ public class Dex2OatService implements Runnable {
 
     @Override
     public void run() {
-        Log.i(TAG, "Dex2oat wrapper daemon start");
         var sockPath = getSockPath();
-        Log.d(TAG, "wrapper path: " + sockPath);
         var magisk_file = "u:object_r:magisk_file:s0";
         var dex2oat_exec = "u:object_r:dex2oat_exec:s0";
         if (SELinux.checkSELinuxAccess("u:r:dex2oat:s0", dex2oat_exec,
@@ -186,12 +155,9 @@ public class Dex2OatService implements Runnable {
                     var fd = new FileDescriptor[]{fdArray[id]};
                     client.setFileDescriptorsForSend(fd);
                     os.write(1);
-                    Log.d(TAG, "Sent stock fd: is64 = " + ((id & 0b10) != 0) +
-                            ", isDebug = " + ((id & 0b01) != 0));
                 }
             }
         } catch (IOException e) {
-            Log.e(TAG, "Dex2oat wrapper daemon crashed", e);
             if (compatibility == DEX2OAT_OK) {
                 doMount(false);
                 compatibility = DEX2OAT_CRASHED;
