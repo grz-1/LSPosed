@@ -26,6 +26,13 @@ plugins {
     alias(libs.plugins.lsplugin.resopt)
 }
 
+apksign {
+    storeFileProperty = "androidStoreFile"
+    storePasswordProperty = "androidStorePassword"
+    keyAliasProperty = "androidKeyAlias"
+    keyPasswordProperty = "androidKeyPassword"
+}
+
 val daemonName = "LSPosed"
 
 val injectedPackageName: String by rootProject.extra
