@@ -51,7 +51,8 @@ namespace lspd {
         }
 
         void postAppSpecialize(const zygisk::AppSpecializeArgs *args) override {
-            MagiskLoader::GetInstance()->OnNativeForkAndSpecializePost(env_, args->nice_name, args->app_data_dir);
+            MagiskLoader::GetInstance()->OnNativeForkAndSpecializePost(env_, args->nice_name,
+                                                                       args->app_data_dir);
             if (*allowUnload) api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
         }
 
@@ -69,7 +70,7 @@ namespace lspd {
                 env_->DeleteLocalRef(name);
                 env_->DeleteLocalRef(process);
             }
-            MagiskLoader::GetInstance()->OnNativeForkSystemServerPost(env_);
+            MagiskLoader::GetInstance()->OnNativeForkSystemServerPost(env_, api_);
             if (*allowUnload) api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
         }
     };
