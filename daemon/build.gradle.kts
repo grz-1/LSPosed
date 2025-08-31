@@ -24,6 +24,7 @@ import java.io.PrintStream
 plugins {
     alias(libs.plugins.agp.app)
     alias(libs.plugins.lsplugin.resopt)
+    alias(libs.plugins.lsplugin.apksign)
 }
 
 apksign {
