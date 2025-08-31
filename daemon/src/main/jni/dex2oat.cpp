@@ -15,8 +15,8 @@ Java_org_lsposed_lspd_service_Dex2OatService_doMountNative(JNIEnv *env, jobject,
                                                            jstring r32, jstring d32,
                                                            jstring r64, jstring d64) {
     char dex2oat32[PATH_MAX], dex2oat64[PATH_MAX];
-    realpath("/data/adb/modules/zygisk_lsposed/bin/dex2oat", dex2oat32);
-    realpath("/data/adb/modules/zygisk_lsposed/bin/dex2oat", dex2oat64);
+    realpath("bin/dex2oat", dex2oat32);
+    realpath("bin/dex2oat", dex2oat64);
 
     if (pid_t pid = fork(); pid > 0) {
         waitpid(pid, nullptr, 0);
@@ -93,5 +93,5 @@ Java_org_lsposed_lspd_service_Dex2OatService_setSockCreateContext(JNIEnv *env, j
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_org_lsposed_lspd_service_Dex2OatService_getSockPath(JNIEnv *env, jobject) {
-    return env->NewStringUTF("7d3f1a9c8e2b5f4a6c0d9e7b2a5f3c1d\0");
+    return env->NewStringUTF("5291374ceda0aef7c5d86cd2a4f6a3ac\0");
 }

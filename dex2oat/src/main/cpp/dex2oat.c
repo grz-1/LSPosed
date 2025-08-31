@@ -10,7 +10,7 @@
 
 #define ID_VEC(is64, is_debug) (((is64) << 1) | (is_debug))
 
-const char kSockName[] = "7d3f1a9c8e2b5f4a6c0d9e7b2a5f3c1d\0";
+const char kSockName[] = "5291374ceda0aef7c5d86cd2a4f6a3ac\0";
 
 static ssize_t xrecvmsg(int sockfd, struct msghdr *msg, int flags) {
     int rec = recvmsg(sockfd, msg, flags);
@@ -81,21 +81,16 @@ int main(int argc, char **argv) {
         PLOGE("failed to connect to %s", sock.sun_path + 1);
         return 1;
     }
-    int is64bit = sizeof(void*) == 8;
-    int isDebug = strstr(argv[0], "dex2oatd") != NULL;
-    write_int(sock_fd, ID_VEC(is64bit, isDebug));
+    write_int(sock_fd, ID_VEC(sizeof(void*) == 8, strstr(argv[0], "dex2oatd") != NULL));
     int stock_fd = recv_fd(sock_fd);
     read_int(sock_fd);
     close(sock_fd);
     LOGD("sock: %s %d", sock.sun_path + 1, stock_fd);
 
-    char **new_argv = malloc((argc + 1) * sizeof(char *));
+    char **new_argv = malloc((argc + 2) * sizeof(char *));
     for (int i = 0; i < argc; i++) new_argv[i] = argv[i];
-    new_argv[argc] = NULL;
-
-    const char* target_path = NULL;
-    target_path = isDebug ? "/data/adb/modules/zygisk_lsposed/bin/dex2oat" : "/data/adb/modules/zygisk_lsposed/bin/dex2oat";
-    new_argv[0] = (char*)target_path;
+    new_argv[argc] = "--inline-max-code-units=0";
+    new_argv[argc + 1] = NULL;
 
     if (getenv("LD_LIBRARY_PATH") == NULL) {
         setenv("LD_LIBRARY_PATH", "/apex/com.android.art/lib64:/apex/com.android.art/lib:/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib", 1);

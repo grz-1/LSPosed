@@ -25,8 +25,8 @@ import java.util.ArrayList;
 
 public class Dex2OatService implements Runnable {
     private static final String TAG = "LSPosedDex2Oat";
-    private static final String WRAPPER32 = "bin/dex2oat32";
-    private static final String WRAPPER64 = "bin/dex2oat64";
+    private static final String WRAPPER32 = "bin/dex2oat";
+    private static final String WRAPPER64 = "bin/dex2oat";
 
     private final String[] dex2oatArray = new String[4];
     private final FileDescriptor[] fdArray = new FileDescriptor[4];
