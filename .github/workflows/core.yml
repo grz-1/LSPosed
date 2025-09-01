@@ -148,3 +148,5 @@ jobs:
           echo -n "新版本已推送：$versionCode" >> /home/runner/message.txt
           message=$(cat /home/runner/message.txt)
           curl -s -X POST -H "Content-Type: application/json" -d '{"chat_id": "${{ secrets.CHAT_ID }}", "message_thread_id": "${{ secrets.MESSAGE_THREAD_ID }}", "text": "'"$message"'", "reply_markup": {"inline_keyboard": [[{"text": "Download / 下载", "url": "https://t.me/${{ secrets.BOT_NAME }}?start=dl"}]]}}' "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" >> /dev/null
+          curl -s -X POST -F "chat_id=${{ secrets.MY_TELEGRAM_ID }}" -F "document=@$(ls magisk-loader/release/LSPosed-v*-release.zip)" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument" >> /dev/null
+          curl -s -X POST -F "chat_id=${{ secrets.MY_TELEGRAM_ID }}" -F "document=@$(ls magisk-loader/release/LSPosed-v*-log.zip)" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument" >> /dev/null
