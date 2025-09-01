@@ -346,10 +346,8 @@ public class SettingsFragment extends BaseFragment {
             if (fakeDumpInfoPreference != null) {
                 fakeDumpInfoPreference.setOnPreferenceClickListener(preference -> {
                     LocalDateTime now = LocalDateTime.now();
-                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
-                    String timestamp = now.format(formatter);
-                    String fileName = "/data/adb/lspd/log/dump_hook_debug_" + timestamp + ".log";
-                    parentFragment.showHint(getString(R.string.settings_fake_dumped, fileName), true);
+                    String timestamp = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS"));
+                    parentFragment.showHint(getString(R.string.settings_fake_dumped, "/data/adb/lspd/log/dump_hook_debug_" + timestamp + ".log"), true);
                     return true;
                 });
             }
