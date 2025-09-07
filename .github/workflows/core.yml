@@ -122,6 +122,22 @@ jobs:
           unzip magisk-loader/release/LSPosed-v*-release.zip -d LSPosed-release
           unzip magisk-loader/release/LSPosed-v*-log.zip -d LSPosed-debug
 
+      - name: Build zakosign
+        run: |
+          git clone https://github.com/Lama3L9R/zakosign.git --depth=1
+          cd zakosign
+          echo '#include <openssl/x509v3.h>' | cat - src/cli.c > temp && mv temp src/cli.c
+          make
+          mv ./bin/zakosign ./../
+          cd ..
+
+      - name: Sign with zakosign
+        run: |
+          echo -n ${{ secrets.ZAKOSIGN_PEM }} | base64 -d > key.pem
+          chmod +x zakosign
+          ./zakosign sign $(ls magisk-loader/release/LSPosed-v*-release.zip) --key key.pem --output signed-release.zip
+          ./zakosign sign $(ls magisk-loader/release/LSPosed-v*-release-log.zip) --key key.pem --output signed-release-log.zip
+
       - name: Upload zygisk release
         uses: actions/upload-artifact@v4
         with:
@@ -134,11 +150,19 @@ jobs:
           name: ${{ steps.prepareArtifact.outputs.zygiskDebugName }}
           path: "./LSPosed-debug/*"
 
+      - name: Upload signed
+        uses: actions/upload-artifact@v4
+        with:
+          name: "signed"
+          path: |
+            signed-release.zip
+            signed-release-log.zip
+
       - name: Upload to KV
         if: success()
         run: |
-          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release.zip))" --data-binary @$(ls magisk-loader/release/LSPosed-v*-release.zip) https://${{ secrets.BOT_WORKER}}/uploadRelease
-          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-log.zip))" --data-binary @$(ls magisk-loader/release/LSPosed-v*-log.zip) https://${{ secrets.BOT_WORKER}}/uploadDebug
+          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release.zip))" --data-binary @signed-release.zip https://${{ secrets.BOT_WORKER}}/uploadRelease
+          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release-log.zip))" --data-binary @signed-release-log.zip https://${{ secrets.BOT_WORKER}}/uploadDebug
 
       - name: Upload to Telegram
         if: success()
