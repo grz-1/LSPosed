@@ -128,15 +128,15 @@ jobs:
           cd zakosign
           echo '#include <openssl/x509v3.h>' | cat - src/cli.c > temp && mv temp src/cli.c
           make
-          mv ./bin/zakosign ./../
+          mv ./bin/zakosign ./../sukizakosign
           cd ..
 
       - name: Sign with zakosign
         run: |
           echo -n ${{ secrets.ZAKOSIGN_PEM }} | base64 -d > key.pem
-          chmod +x zakosign
-          ./zakosign sign $(ls magisk-loader/release/LSPosed-v*-release.zip) --key key.pem --output signed-release.zip
-          ./zakosign sign $(ls magisk-loader/release/LSPosed-v*-release-log.zip) --key key.pem --output signed-release-log.zip
+          chmod +x sukizakosign
+          ./sukizakosign sign $(ls magisk-loader/release/LSPosed-v*-release.zip) --key key.pem --output signed-release.zip
+          ./sukizakosign sign $(ls magisk-loader/release/LSPosed-v*-release-log.zip) --key key.pem --output signed-release-log.zip
 
       - name: Upload zygisk release
         uses: actions/upload-artifact@v4
