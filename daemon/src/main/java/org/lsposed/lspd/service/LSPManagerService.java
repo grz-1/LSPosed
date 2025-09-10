@@ -196,7 +196,7 @@ public class LSPManagerService extends ILSPManagerService.Stub {
     private void ensureWebViewPermission(File f) {
         if (!f.exists()) return;
         try {
-            SELinux.setFileContext(f.getAbsolutePath(), "u:object_r:magisk_file:s0");
+            SELinux.setFileContext(f.getAbsolutePath(), "u:object_r:lsposed_file:s0");
             Os.chown(f.getAbsolutePath(), BuildConfig.MANAGER_INJECTED_UID, BuildConfig.MANAGER_INJECTED_UID);
         } catch (ErrnoException e) {
             Logger.e(TAG, "chown or setFileContext of webview failed", e);

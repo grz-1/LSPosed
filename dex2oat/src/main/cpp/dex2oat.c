@@ -1,3 +1,26 @@
+/*
+ * This file is part of LSPosed.
+ *
+ * LSPosed is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * LSPosed is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with LSPosed.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * Copyright (C) 2022 LSPosed Contributors
+ */
+
+//
+// Created by Nullptr on 2022/4/1.
+//
+
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,6 +30,12 @@
 #include <unistd.h>
 
 #include "logging.h"
+
+#if defined(__LP64__)
+# define LP_SELECT(lp32, lp64) lp64
+#else
+# define LP_SELECT(lp32, lp64) lp32
+#endif
 
 #define ID_VEC(is64, is_debug) (((is64) << 1) | (is_debug))
 
@@ -22,14 +51,14 @@ static ssize_t xrecvmsg(int sockfd, struct msghdr *msg, int flags) {
 
 static void *recv_fds(int sockfd, char *cmsgbuf, size_t bufsz, int cnt) {
     struct iovec iov = {
-            .iov_base = &cnt,
-            .iov_len  = sizeof(cnt),
+        .iov_base = &cnt,
+        .iov_len  = sizeof(cnt),
     };
     struct msghdr msg = {
-            .msg_iov        = &iov,
-            .msg_iovlen     = 1,
-            .msg_control    = cmsgbuf,
-            .msg_controllen = bufsz
+        .msg_iov        = &iov,
+        .msg_iovlen     = 1,
+        .msg_control    = cmsgbuf,
+        .msg_controllen = bufsz
     };
 
     xrecvmsg(sockfd, &msg, MSG_WAITALL);
@@ -41,9 +70,9 @@ static void *recv_fds(int sockfd, char *cmsgbuf, size_t bufsz, int cnt) {
         cmsg->cmsg_level != SOL_SOCKET ||
         cmsg->cmsg_type != SCM_RIGHTS) {
         return NULL;
-    }
+        }
 
-    return CMSG_DATA(cmsg);
+        return CMSG_DATA(cmsg);
 }
 
 static int recv_fd(int sockfd) {
@@ -81,22 +110,41 @@ int main(int argc, char **argv) {
         PLOGE("failed to connect to %s", sock.sun_path + 1);
         return 1;
     }
-    write_int(sock_fd, ID_VEC(sizeof(void*) == 8, strstr(argv[0], "dex2oatd") != NULL));
+    write_int(sock_fd, ID_VEC(LP_SELECT(0, 1), strstr(argv[0], "dex2oatd") != NULL));
     int stock_fd = recv_fd(sock_fd);
     read_int(sock_fd);
     close(sock_fd);
-    LOGD("sock: %s %d", sock.sun_path + 1, stock_fd);
 
-    char **new_argv = malloc((argc + 2) * sizeof(char *));
+    sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (connect(sock_fd, (struct sockaddr *) &sock, len)) {
+        PLOGE("failed to connect to %s", sock.sun_path + 1);
+        return 1;
+    }
+    write_int(sock_fd, LP_SELECT(4, 5));
+    int preload_fd = recv_fd(sock_fd);
+    read_int(sock_fd);
+    close(sock_fd);
+
+    LOGD("sock path: %s, stock_fd: %d, preload_fd: %d", sock.sun_path + 1, stock_fd, preload_fd);
+
+    const char *new_argv[argc + 1];
     for (int i = 0; i < argc; i++) new_argv[i] = argv[i];
-    new_argv[argc] = "--inline-max-code-units=0";
-    new_argv[argc + 1] = NULL;
+    new_argv[argc] = nullptr;
 
     if (getenv("LD_LIBRARY_PATH") == NULL) {
-        setenv("LD_LIBRARY_PATH", "/apex/com.android.art/lib64:/apex/com.android.art/lib:/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib", 1);
+        char const *libenv =
+        "LD_LIBRARY_PATH=/apex/com.android.art/lib64:/apex/com.android.art/lib"
+        ":/apex/com.android.os.statsd/lib64:/apex/com.android.os.statsd/lib";
+    putenv((char *)libenv);
     }
 
-    fexecve(stock_fd, new_argv, environ);
+    int path_len = 50;
+    char env_str[path_len];
+    snprintf(env_str, path_len, "LD_PRELOAD=/proc/%d/fd/%d", getpid(), preload_fd);
+    putenv(env_str);
+    LOGD("set env %s", env_str);
+
+    fexecve(stock_fd, (char **) new_argv, environ);
     PLOGE("fexecve failed");
     return 2;
 }
