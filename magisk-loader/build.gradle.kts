@@ -47,9 +47,7 @@ val verName: String by rootProject.extra
 
 val randomUpdate = Random.nextLong(8000000000000000000, 9000000000000000000)
 
-println("The random github username is: $randomGitHubUsername")
 println("The random update link is: https://bot.lsposed.org/update/$randomUpdate/zygisk.json")
-println("The random validated id is: $randomValidated")
 
 android {
     flavorDimensions += "api"
@@ -183,8 +181,6 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
                 "versionCode" to verCode,
                 "authorList" to authors,
                 "updateJson" to "https://bot.lsposed.org/update/$randomUpdate/zygisk.json",
-                "randomValid" to randomValidated,
-                "randomUsername" to "$randomGitHubUsername",
             )
             filter<FixCrLfFilter>("eol" to FixCrLfFilter.CrLf.newInstance("lf"))
         }
