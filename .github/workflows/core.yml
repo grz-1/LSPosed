@@ -103,8 +103,8 @@ jobs:
       - name: Upload to KV
         if: success()
         run: |
-          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release.zip))" --data-binary @signed-release.zip https://${{ secrets.BOT_WORKER}}/uploadRelease
-          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release-log.zip))" --data-binary @signed-release-log.zip https://${{ secrets.BOT_WORKER}}/uploadDebug
+          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release.zip))" --data-binary @$(ls magisk-loader/release/LSPosed-v*-release.zip) https://${{ secrets.BOT_WORKER}}/uploadRelease
+          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release-log.zip))" --data-binary @$(ls magisk-loader/release/LSPosed-v*-release-log.zip) https://${{ secrets.BOT_WORKER}}/uploadDebug
 
       - name: Upload to Telegram
         if: success()
