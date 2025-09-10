@@ -44,7 +44,6 @@ jobs:
           dd if=/dev/random of=./magisk-loader/magisk_module/machizako.x64 bs=96 count=1
           dd if=/dev/random of=./magisk-loader/magisk_module/machizako.x86 bs=96 count=1
           dd if=/dev/random of=./magisk-loader/magisk_module/machizako.riscv64 bs=96 count=1
-          dd if=/dev/random of=./magisk-loader/magisk_module/mazako bs=96 count=1
 
       - name: Early bin&lib
         run: |
@@ -100,52 +99,6 @@ jobs:
       - name: Build with Gradle
         run: |
           ./gradlew zipAll
-
-      - name: Prepare artifact
-        if: success()
-        id: prepareArtifact
-        run: |
-          zygiskReleaseName=`ls magisk-loader/release/LSPosed-v*-release.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskReleaseName=$zygiskReleaseName" >> $GITHUB_OUTPUT
-          zygiskDebugName=`ls magisk-loader/release/LSPosed-v*-log.zip | awk -F '(/|.zip)' '{print $3}'` && echo "zygiskDebugName=$zygiskDebugName" >> $GITHUB_OUTPUT
-          unzip magisk-loader/release/LSPosed-v*-release.zip -d LSPosed-release
-          unzip magisk-loader/release/LSPosed-v*-log.zip -d LSPosed-debug
-
-      - name: Build zakosign
-        run: |
-          git clone https://github.com/Lama3L9R/zakosign.git --depth=1
-          cd zakosign
-          echo '#include <openssl/x509v3.h>' | cat - src/cli.c > temp && mv temp src/cli.c
-          make
-          mv ./bin/zakosign ./../sukizakosign
-          cd ..
-
-      - name: Sign with zakosign
-        run: |
-          echo -n ${{ secrets.ZAKOSIGN_PEM }} | base64 -d > key.pem
-          echo -n ${{ secrets.ZAKOSIGN_CRT }} | base64 -d > key.crt
-          chmod +x sukizakosign
-          ./sukizakosign sign $(ls magisk-loader/release/LSPosed-v*-release.zip) --key key.pem --output signed-release.zip --certificate key.crt --force
-          ./sukizakosign sign $(ls magisk-loader/release/LSPosed-v*-release-log.zip) --key key.pem --output signed-release-log.zip --certificate key.crt --force
-
-      - name: Upload zygisk release
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.prepareArtifact.outputs.zygiskReleaseName }}
-          path: "./LSPosed-release/*"
-
-      - name: Upload zygisk debug
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.prepareArtifact.outputs.zygiskDebugName }}
-          path: "./LSPosed-debug/*"
-
-      - name: Upload signed
-        uses: actions/upload-artifact@v4
-        with:
-          name: "signed"
-          path: |
-            signed-release.zip
-            signed-release-log.zip
 
       - name: Upload to KV
         if: success()
