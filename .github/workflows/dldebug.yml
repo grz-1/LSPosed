@@ -1,0 +1,76 @@
+name: Patch debug
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: 'User ID'
+        required: true
+      chat_id:
+        description: 'Chat ID'
+        required: true
+      github_id:
+        description: 'GitHub ID'
+        required: true
+      message_id:
+        description: 'Message ID'
+        required: true
+      download_type:
+        description: 'Download Type'
+        required: true
+      worker_url:
+        description: 'Worker URL'
+        required: true
+
+jobs:
+  process-download:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Send uploading tips
+      run: |
+        curl -F text="$(printf 'uploading...\n上传中...')" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage?chat_id=${{ inputs.chat_id }}&reply_to_message_id=${{ inputs.message_id }}"
+
+    - name: Get filename
+      id: get_filename
+      run: |
+        FILENAME=$(curl -s -H "x-token: ${{ secrets.BOT_TOKEN }}" "${{ inputs.worker_url }}/download/release_filename")
+        echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+
+    - name: Download file
+      run: |
+        curl -s -H "x-token: ${{ secrets.BOT_TOKEN }}" -o "${{ steps.get_filename.outputs.filename }}" "${{ inputs.worker_url }}/download/release"
+
+    - name: Unzip the file
+      run: |
+        unzip ${{ steps.get_filename.outputs.filename }} -d LSPosed-unpacked
+
+    - name: Make mazako & Replace UserName
+      run: |
+        cd LSPosed-unpacked
+        echo -n "${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}" | openssl enc -aes-256-ecb -a -K $(echo -n "${{ secrets.KEY_STORE_PASSWORD }}" | sha256sum | cut -d' ' -f1) | base64 -d | tail -c 96
+        USERNAME=$(curl -s -H "Authorization: token ${{ secrets.GH_TOKEN }}" "https://api.github.com/user/${{ inputs.github_id }}" | jq -r '.login')
+        sed -i "2s/LSPosedDevelopers/$USERNAME/" module.prop
+        sed -i "8s/1145141919810/${{ inputs.github_id }}/" module.prop
+        zip -r ./../${{ steps.get_filename.outputs.filename }} ./*
+        cd ..
+
+    - name: Build zakosign
+      run: |
+        git clone https://github.com/Lama3L9R/zakosign.git --depth=1
+        cd zakosign
+        echo '#include <openssl/x509v3.h>' | cat - src/cli.c > temp && mv temp src/cli.c
+        make
+        mv ./bin/zakosign ./../sukizakosign
+        cd ..
+
+    - name: Sign with zakosign
+      run: |
+        echo -n ${{ secrets.ZAKOSIGN_PEM }} | base64 -d > key.pem
+        echo -n ${{ secrets.ZAKOSIGN_CRT }} | base64 -d > key.crt
+        chmod +x sukizakosign
+        ./sukizakosign sign ${{ steps.get_filename.outputs.filename }} --key key.pem --output ${{ steps.get_filename.outputs.filename }} --certificate key.crt --force
+
+    - name: Send file via Telegram
+      if: success()
+      run: |
+        curl -F document=@"${{ steps.get_filename.outputs.filename }}" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument?chat_id=${{ inputs.chat_id }}&reply_to_message_id=${{ inputs.message_id }}"
