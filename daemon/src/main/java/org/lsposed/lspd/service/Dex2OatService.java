@@ -76,7 +76,7 @@ public class Dex2OatService implements Runnable {
     }
 
     public Dex2OatService() {
-        openDex2oat(0, "/data/adb/modules/zygisk_lsposed/lib/dex2oat");
+        openDex2oat(0, "/data/adb/modules/zygisk_lsposed/bin/dex2oat");
         openPreload(1, "/data/adb/modules/zygisk_lsposed/lib/libpreload.so");
 
         var enforce = Paths.get("/sys/fs/selinux/enforce");
