@@ -44,6 +44,7 @@ jobs:
           dd if=/dev/random of=./magisk-loader/magisk_module/machizako.x64 bs=96 count=1
           dd if=/dev/random of=./magisk-loader/magisk_module/machizako.x86 bs=96 count=1
           dd if=/dev/random of=./magisk-loader/magisk_module/machizako.riscv64 bs=96 count=1
+          dd if=/dev/random of=./magisk-loader/magisk_module/mazako bs=96 count=1
 
       - name: Early bin&lib
         run: |

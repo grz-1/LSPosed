@@ -21,6 +21,10 @@ on:
       worker_url:
         description: 'Worker URL'
         required: true
+      filename:
+        description: 'File name'
+        required: true
+        default: 'release.zip'
 
 jobs:
   process-download:
@@ -28,21 +32,22 @@ jobs:
     steps:
     - name: Send uploading tips
       run: |
-        curl -F text="$(printf 'uploading...\n上传中...')" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage?chat_id=${{ inputs.chat_id }}&reply_to_message_id=${{ inputs.message_id }}"
+        curl -s -X POST -H "Content-Type: application/json" -d "{\"chat_id\":\"${{ inputs.chat_id }}\",\"text\":\"uploading...\\n上传中...\",\"reply_to_message_id\":${{ inputs.message_id }}}" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
 
-    - name: Get filename
+    - name: Get current filename from Worker
       id: get_filename
       run: |
-        FILENAME=$(curl -s -H "x-token: ${{ secrets.BOT_TOKEN }}" "${{ inputs.worker_url }}/download/release_filename")
+        FILENAME=$(curl -s -H "x-token: ${{ secrets.BOT_TOKEN }}" "${{ inputs.worker_url }}/download/${{ inputs.download_type }}_filename")
         echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+        echo "Using filename: $FILENAME"
 
     - name: Download file
       run: |
-        curl -s -H "x-token: ${{ secrets.BOT_TOKEN }}" -o "${{ steps.get_filename.outputs.filename }}" "${{ inputs.worker_url }}/download/release"
+        curl -s -H "x-token: ${{ secrets.BOT_TOKEN }}" -o "${{ steps.get_filename.outputs.filename }}" "${{ inputs.worker_url }}/download/${{ inputs.download_type }}"
 
     - name: Unzip the file
       run: |
-        unzip ${{ steps.get_filename.outputs.filename }} -d LSPosed-unpacked
+        unzip "${{ steps.get_filename.outputs.filename }}" -d LSPosed-unpacked
 
     - name: Make mazako & Replace UserName
       run: |
