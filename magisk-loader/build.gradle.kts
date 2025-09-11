@@ -142,7 +142,8 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
     val variantCapped = variant.name.replaceFirstChar { it.uppercase() }
     val variantLowered = variant.name.lowercase()
     val buildTypeCapped = variant.buildType.name.replaceFirstChar { it.uppercase() }
-    val buildTypeLowered = if (variant.buildType.name.lowercase() == "debug") {
+    val buildTypeLowered = variant.buildType.name.lowercase()
+    val buildTypeLoweredRenamed = if (variant.buildType.name.lowercase() == "debug") {
         "release-log"
     } else {
         "release"
@@ -152,7 +153,7 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
     val magiskDir = layout.buildDirectory.dir("magisk/$variantLowered")
 
     val moduleId = "${flavorLowered}_$moduleBaseId"
-    val zipFileName = "$moduleName-v$verName-ed-$verCode-$buildTypeLowered.zip"
+    val zipFileName = "$moduleName-v$verName-ed-$verCode-$buildTypeLoweredRenamed.zip"
 
     val prepareMagiskFilesTask = tasks.register<Sync>(
         "prepareMagiskFiles$variantCapped"
