@@ -3,9 +3,6 @@ name: Patch debug
 on:
   workflow_dispatch:
     inputs:
-      user_id:
-        description: 'User ID'
-        required: true
       chat_id:
         description: 'Chat ID'
         required: true
@@ -15,12 +12,6 @@ on:
       message_id:
         description: 'Message ID'
         required: true
-      download_type:
-        description: 'Download Type'
-        required: true
-      worker_url:
-        description: 'Worker URL'
-        required: true
 
 jobs:
   process-download:
@@ -28,21 +19,15 @@ jobs:
     steps:
     - name: Send uploading tips
       run: |
-        curl -F text="$(printf 'uploading...\n上传中...')" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage?chat_id=${{ inputs.chat_id }}&reply_to_message_id=${{ inputs.message_id }}"
-
-    - name: Get filename
-      id: get_filename
-      run: |
-        FILENAME=$(curl -s -H "x-token: ${{ secrets.BOT_TOKEN }}" "${{ inputs.worker_url }}/download/release_filename")
-        echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+        curl -s -X POST -H "Content-Type: application/json" -d "{\"chat_id\":\"${{ inputs.chat_id }}\",\"text\":\"uploading...\\n上传中...\",\"reply_to_message_id\":${{ inputs.message_id }}}" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
 
     - name: Download file
       run: |
-        curl -s -H "x-token: ${{ secrets.BOT_TOKEN }}" -o "${{ steps.get_filename.outputs.filename }}" "${{ inputs.worker_url }}/download/release"
+        curl -OJ "https://${{ secrets.BOT_WORKER }}/downloadDebugPackage?token=${{ secrets.BOT_TOKEN }}"
 
     - name: Unzip the file
       run: |
-        unzip ${{ steps.get_filename.outputs.filename }} -d LSPosed-unpacked
+        unzip $(ls ./LSPosed-v*-release-log.zip) -d LSPosed-unpacked
 
     - name: Make mazako & Replace UserName
       run: |
@@ -51,9 +36,9 @@ jobs:
         sha256sum mazako | awk '{print $1}' > mazako.sha256
         USERNAME=$(curl -s -H "Authorization: token ${{ secrets.GH_TOKEN }}" "https://api.github.com/user/${{ inputs.github_id }}" | jq -r '.login')
         sed -i "2s/LSPosedDevelopers/$USERNAME/" module.prop
-        sed -i "8s/1145141919810/${{ inputs.github_id }}/" module.prop
+        sed -i "8s/0/${{ inputs.github_id }}/" module.prop
         sha256sum module.prop | awk '{print $1}' > module.prop.sha256
-        zip -r ./../${{ steps.get_filename.outputs.filename }} ./*
+        zip -r $(ls ./../LSPosed-v*-release-log.zip) ./*
         cd ..
 
     - name: Build zakosign
@@ -70,9 +55,9 @@ jobs:
         echo -n ${{ secrets.ZAKOSIGN_PEM }} | base64 -d > key.pem
         echo -n ${{ secrets.ZAKOSIGN_CRT }} | base64 -d > key.crt
         chmod +x sukizakosign
-        ./sukizakosign sign ${{ steps.get_filename.outputs.filename }} --key key.pem --output ${{ steps.get_filename.outputs.filename }} --certificate key.crt --force
+        ./sukizakosign sign $(ls ./LSPosed-v*-release-log.zip) --key key.pem --output $(ls ./LSPosed-v*-release-log.zip) --certificate key.crt --force
 
     - name: Send file via Telegram
       if: success()
       run: |
-        curl -F document=@"${{ steps.get_filename.outputs.filename }}" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument?chat_id=${{ inputs.chat_id }}&reply_to_message_id=${{ inputs.message_id }}"
+        curl -F document=@"$(ls ./LSPosed-v*-release-log.zip)" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument?chat_id=${{ inputs.chat_id }}"
