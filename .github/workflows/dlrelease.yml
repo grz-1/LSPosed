@@ -17,10 +17,6 @@ jobs:
   process-download:
     runs-on: ubuntu-latest
     steps:
-    - name: Send uploading tips
-      run: |
-        curl -s -X POST -H "Content-Type: application/json" -d "{\"chat_id\":\"${{ inputs.chat_id }}\",\"text\":\"uploading...\\n上传中...\",\"reply_to_message_id\":${{ inputs.message_id }}}" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
-
     - name: Download file
       run: |
         curl -OJ "https://${{ secrets.BOT_WORKER }}/downloadReleasePackage?token=${{ secrets.BOT_TOKEN }}"
@@ -58,6 +54,10 @@ jobs:
         FILENAME=$(ls ./LSPosed-v*-release.zip)
         rm $FILENAME
         ./sukizakosign sign ./LSPosed.zip --key key.pem --output $FILENAME --certificate key.crt --force
+
+    - name: Send uploading tips
+      run: |
+        curl -s -X POST -H "Content-Type: application/json" -d "{\"chat_id\":\"${{ inputs.chat_id }}\",\"text\":\"uploading...\\n上传中...\",\"reply_to_message_id\":${{ inputs.message_id }}}" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
 
     - name: Send file via Telegram
       if: success()
