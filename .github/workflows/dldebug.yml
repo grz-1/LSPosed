@@ -38,7 +38,7 @@ jobs:
         sed -i "2s/LSPosedDevelopers/$USERNAME/" module.prop
         sed -i "8s/0/${{ inputs.github_id }}/" module.prop
         sha256sum module.prop | awk '{print $1}' > module.prop.sha256
-        zip -r $(ls ./../LSPosed-v*-release-log.zip) ./*
+        zip -r ./../LSPosed.zip ./*
         cd ..
 
     - name: Build zakosign
@@ -55,7 +55,7 @@ jobs:
         echo -n ${{ secrets.ZAKOSIGN_PEM }} | base64 -d > key.pem
         echo -n ${{ secrets.ZAKOSIGN_CRT }} | base64 -d > key.crt
         chmod +x sukizakosign
-        ./sukizakosign sign $(ls ./LSPosed-v*-release-log.zip) --key key.pem --output $(ls ./LSPosed-v*-release-log.zip) --certificate key.crt --force
+        ./sukizakosign sign ./LSPosed.zip --key key.pem --output $(ls ./LSPosed-v*-release-log.zip) --certificate key.crt --force
 
     - name: Send file via Telegram
       if: success()
