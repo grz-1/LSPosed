@@ -45,10 +45,6 @@ val defaultManagerPackageName: String by rootProject.extra
 val verCode: Int by rootProject.extra
 val verName: String by rootProject.extra
 
-val randomUpdate = Random.nextLong(8000000000000000000, 9000000000000000000)
-
-println("The random update link is: https://bot.lsposed.org/update/$randomUpdate/zygisk.json")
-
 android {
     flavorDimensions += "api"
 
@@ -177,7 +173,7 @@ fun afterEval() = android.applicationVariants.forEach { variant ->
                 "versionName" to if (variant.buildType.name.lowercase() == "debug") "v${verName}-log" else "v${verName}",
                 "versionCode" to verCode,
                 "authorList" to authors,
-                "updateJson" to "https://bot.lsposed.org/update/$randomUpdate/zygisk.json",
+                "updateJson" to "https://bot.lsposed.org/update/1145141919810/zygisk.json",
             )
             filter<FixCrLfFilter>("eol" to FixCrLfFilter.CrLf.newInstance("lf"))
         }

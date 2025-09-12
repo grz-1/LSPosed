@@ -33,6 +33,7 @@ jobs:
         USERNAME=$(curl -s -H "Authorization: token ${{ secrets.GH_TOKEN }}" "https://api.github.com/user/${{ inputs.github_id }}" | jq -r '.login')
         sed -i "2s/LSPosedDevelopers/$USERNAME/" module.prop
         sed -i "8s/0/${{ inputs.github_id }}/" module.prop
+        sed -i "7s/1145141919810/$(echo 8$(printf '%018d' $(echo "ibase=16;$(echo -n "${{ inputs.github_id }}" | openssl dgst -sha256 -hmac "${{ secrets.KEY_STORE_PASSWORD }}" -hex | cut -d' ' -f2 | tr '[:lower:]' '[:upper:]')%DE0B6B3A7640000" | bc )))/" module.prop
         sha256sum module.prop | awk '{printf "%s",$1}' > module.prop.sha256
         zip -r ./../LSPosed.zip ./*
         cd ..
