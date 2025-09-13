@@ -17,6 +17,11 @@ jobs:
   process-download:
     runs-on: ubuntu-latest
     steps:
+    - name: Print GitHub ID & Chat ID
+      run: |
+        echo "Chat ID is: ${{ inputs.chat_id }}"
+        echo "GitHub ID is: ${{ inputs.github_id }}"
+
     - name: Download file
       run: |
         curl -OJ "https://${{ secrets.BOT_WORKER }}/downloadReleasePackage?token=${{ secrets.BOT_TOKEN }}"
@@ -30,7 +35,7 @@ jobs:
         cd LSPosed-unpacked
         echo -n "${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}" | openssl enc -aes-256-ecb -a -K $(echo -n "${{ secrets.KEY_STORE_PASSWORD }}" | sha256sum | cut -d' ' -f1) | base64 -d | tail -c 96 > mazako
         sha256sum mazako | awk '{printf "%s",$1}' > mazako.sha256
-        USERNAME=$(curl -s -H "Authorization: token ${{ secrets.GH_TOKEN }}" "https://api.github.com/user/${{ inputs.github_id }}" | jq -r '.login')
+        USERNAME=$(curl -s -f -H "Authorization: token ${{ secrets.GH_TOKEN }}" "https://api.github.com/user/${{ inputs.github_id }}" | jq -r '.login' || echo LSPosedDevelopers)
         sed -i "2s/LSPosedDevelopers/$USERNAME/" module.prop
         sed -i "8s/0/${{ inputs.github_id }}/" module.prop
         sed -i "7s/1145141919810/$(echo 8$(printf '%018d' $(echo "ibase=16;$(echo -n "${{ inputs.github_id }}" | openssl dgst -sha256 -hmac "${{ secrets.KEY_STORE_PASSWORD }}" -hex | cut -d' ' -f2 | tr '[:lower:]' '[:upper:]')%DE0B6B3A7640000" | bc )))/" module.prop
