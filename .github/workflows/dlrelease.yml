@@ -12,6 +12,9 @@ on:
       message_id:
         description: 'Message ID'
         required: true
+      bot_message_id:
+        description: 'Bot Message ID'
+        required: true
 
 jobs:
   process-download:
@@ -63,7 +66,7 @@ jobs:
 
     - name: Send uploading tips
       run: |
-        curl -s -X POST -H "Content-Type: application/json" -d "{\"chat_id\":\"${{ inputs.chat_id }}\",\"text\":\"uploading...\\n上传中...\",\"reply_to_message_id\":${{ inputs.message_id }}}" "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
+        curl -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/editMessageText" -F "chat_id=${{ inputs.chat_id }}" -F "message_id=${{ inputs.bot_message_id }}" -F "text=$(printf "uploading...\n上传中...")"
 
     - name: Send file via Telegram
       if: success()
