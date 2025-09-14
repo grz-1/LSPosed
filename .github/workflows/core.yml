@@ -60,7 +60,7 @@ jobs:
           dd if=/dev/random bs=5752 count=1 of=./magisk-loader/magisk_module/lib/riscv64/libpreload.so
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
