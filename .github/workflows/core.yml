@@ -5,7 +5,8 @@ on:
   push:
     branches: [ dev ]
     tags: [ v* ]
-  pull_request:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
   merge_group:
 
 jobs:
@@ -27,6 +28,7 @@ jobs:
           fetch-depth: 0
 
       - name: Write key
+        if: github.actor == 'dependabot[bot]' || github.actor == 'PKQandBaaad'
         run: |
           if [ ! -z "${{ secrets.KEY_STORE }}" ]; then
             echo androidStorePassword='${{ secrets.KEY_STORE_PASSWORD }}' >> gradle.properties
@@ -102,13 +104,13 @@ jobs:
           ./gradlew zipAll
 
       - name: Upload to KV
-        if: success()
+        if: success() && github.actor == 'dependabot[bot]' || github.actor == 'PKQandBaaad'
         run: |
           curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release.zip))" --data-binary @$(ls magisk-loader/release/LSPosed-v*-release.zip) https://${{ secrets.BOT_WORKER }}/uploadRelease
           curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release-log.zip))" --data-binary @$(ls magisk-loader/release/LSPosed-v*-release-log.zip) https://${{ secrets.BOT_WORKER }}/uploadDebug
 
       - name: Upload to Telegram
-        if: success()
+        if: success() && github.actor == 'dependabot[bot]' || github.actor == 'PKQandBaaad'
         run: |
           versionCode=$(basename $(ls magisk-loader/release/LSPosed-v*-release.zip) | cut -d'-' -f5)
           echo "New version pushed: $versionCode" > /home/runner/message.txt
