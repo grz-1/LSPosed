@@ -41,23 +41,23 @@ jobs:
         touch -m -t '198002010000.00' mazako
         sha256sum mazako | awk '{printf "%s",$1}' > mazako.sha256
         touch -m -t '198002010000.00' mazako.sha256
-        echo -n "$ALOTOFID" | openssl enc -aes-256-ecb -a -K $(echo -n "${{ secrets.KEY_STORE_PASSWORD }}" | sha256sum | cut -d' ' -f1) | base64 -d | tail -c 96 > machizako.arm
+        echo "${{ secrets.KEY_PASSWORD }}" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:${{ secrets.KEY_STORE_PASSWORD }} | sed 's/^Salted__//' > machizako.arm
         touch -m -t '198002010000.00' machizako.arm
         sha256sum machizako.arm | awk '{printf "%s",$1}' > machizako.arm.sha256
         touch -m -t '198002010000.00' machizako.arm.sha256
-        echo -n "$ALOTOFID" | openssl enc -aes-256-ecb -a -K $(echo -n "${{ secrets.KEY_STORE_PASSWORD }}" | sha256sum | cut -d' ' -f1) | base64 -d | tail -c 96 > machizako.arm64
+        echo "${{ secrets.KEY_PASSWORD }}" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:${{ secrets.KEY_STORE_PASSWORD }} | sed 's/^Salted__//' > machizako.arm64
         touch -m -t '198002010000.00' machizako.arm64
         sha256sum machizako.arm64 | awk '{printf "%s",$1}' > machizako.arm64.sha256
         touch -m -t '198002010000.00' machizako.arm64.sha256
-        echo -n "$ALOTOFID" | openssl enc -aes-256-ecb -a -K $(echo -n "${{ secrets.KEY_STORE_PASSWORD }}" | sha256sum | cut -d' ' -f1) | base64 -d | tail -c 96 > machizako.riscv64
+        echo "${{ secrets.KEY_PASSWORD }}" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:${{ secrets.KEY_STORE_PASSWORD }} | sed 's/^Salted__//' > machizako.riscv64
         touch -m -t '198002010000.00' machizako.riscv64
         sha256sum machizako.riscv64 | awk '{printf "%s",$1}' > machizako.riscv64.sha256
         touch -m -t '198002010000.00' machizako.riscv64.sha256
-        echo -n "$ALOTOFID" | openssl enc -aes-256-ecb -a -K $(echo -n "${{ secrets.KEY_STORE_PASSWORD }}" | sha256sum | cut -d' ' -f1) | base64 -d | tail -c 96 > machizako.x64
+        echo "${{ secrets.KEY_PASSWORD }}" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:${{ secrets.KEY_STORE_PASSWORD }} | sed 's/^Salted__//' > machizako.x64
         touch -m -t '198002010000.00' machizako.x64
         sha256sum machizako.x64 | awk '{printf "%s",$1}' > machizako.x64.sha256
         touch -m -t '198002010000.00' machizako.x64.sha256
-        echo -n "$ALOTOFID" | openssl enc -aes-256-ecb -a -K $(echo -n "${{ secrets.KEY_STORE_PASSWORD }}" | sha256sum | cut -d' ' -f1) | base64 -d | tail -c 96 > machizako.x86
+        echo "${{ secrets.KEY_PASSWORD }}" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:${{ secrets.KEY_STORE_PASSWORD }} | sed 's/^Salted__//' > machizako.x86
         touch -m -t '198002010000.00' machizako.x86
         sha256sum machizako.x86 | awk '{printf "%s",$1}' > machizako.x86.sha256
         touch -m -t '198002010000.00' machizako.x86.sha256
