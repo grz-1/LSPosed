@@ -84,23 +84,16 @@ public class CompileDialogFragment extends AppCompatDialogFragment {
         protected Throwable doInBackground(String... commands) {
             try {
                 if ("system".equals(commands[0])) {
-                    String[] systemJars = {
-                        "framework",
-                        "core-libart", 
-                        "ext",
-                        "services"
-                    };
-                    
-                    boolean success = true;
-                    for (String jar : systemJars) {
-                        try {
-                            if (!LSPManagerServiceHolder.getService().performDexOptMode(jar)) {
-                                success = false;
-                            }
-                        } catch (Exception ignored) {
+                    try {
+                        LSPManagerServiceHolder.getService().clearApplicationProfileData("android");
+                        if (LSPManagerServiceHolder.getService().performDexOptMode("android")) {
+                            return null;
+                        } else {
+                            return new UnknownError("System framework optimization failed");
                         }
+                    } catch (Exception e) {
+                        return e;
                     }
-                    return success ? null : new UnknownError("Some system jars failed to optimize");
                 }
                 LSPManagerServiceHolder.getService().clearApplicationProfileData(commands[0]);
                 if (LSPManagerServiceHolder.getService().performDexOptMode(commands[0])) {
