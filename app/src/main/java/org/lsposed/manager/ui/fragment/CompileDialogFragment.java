@@ -83,6 +83,26 @@ public class CompileDialogFragment extends AppCompatDialogFragment {
         @Override
         protected Throwable doInBackground(String... commands) {
             try {
+                if ("system".equals(commands[0])) {
+                    String[] systemJars = {
+                        "framework",
+                        "core-libart", 
+                        "ext",
+                        "services"
+                    };
+                    
+                    boolean success = true;
+                    for (String jar : systemJars) {
+                        try {
+                            if (!LSPManagerServiceHolder.getService().performDexOptMode(jar)) {
+                                success = false;
+                            }
+                        } catch (Exception e) {
+                            Log.w("LSPosed", "Failed to optimize " + jar, e);
+                        }
+                    }
+                    return success ? null : new UnknownError("Some system jars failed to optimize");
+                }
                 LSPManagerServiceHolder.getService().clearApplicationProfileData(commands[0]);
                 if (LSPManagerServiceHolder.getService().performDexOptMode(commands[0])) {
                     return null;
