@@ -97,8 +97,7 @@ public class CompileDialogFragment extends AppCompatDialogFragment {
                             if (!LSPManagerServiceHolder.getService().performDexOptMode(jar)) {
                                 success = false;
                             }
-                        } catch (Exception e) {
-                            Log.w("LSPosed", "Failed to optimize " + jar, e);
+                        } catch (Exception ignored) {
                         }
                     }
                     return success ? null : new UnknownError("Some system jars failed to optimize");
