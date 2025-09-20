@@ -37,30 +37,32 @@ jobs:
       run: |
         cd LSPosed-unpacked
         ALOTOFID="${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}${{ inputs.github_id }}"
-        echo -n "$ALOTOFID" | openssl enc -aes-256-ecb -a -K $(echo -n "${{ secrets.KEY_STORE_PASSWORD }}" | sha256sum | cut -d' ' -f1) | base64 -d | tail -c 96 > mazako
-        touch -m -t '198002010000.00' mazako
-        sha256sum mazako | awk '{printf "%s",$1}' > mazako.sha256
-        touch -m -t '198002010000.00' mazako.sha256
-        echo -n "$ALOTOFID" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:${{ secrets.KEY_STORE_PASSWORD }} | sed 's/^Salted__//' > machizako.arm
+
+        echo -n "$(cat module.prop.sha256 && cat action.sh.sha256 && cat post-fs-data.sh.sha256 && cat uninstall.sh.sha256 && cat sepolicy.rule.sha256 && cat framework/lspd.dex.sha256 && cat daemon.apk.sha256 && cat daemon.sha256 && cat lspd.sha256 && cat manager.apk.sha256 &&  cat lib/armeabi-v7a/liblspd.so.sha256 && cat lib/armeabi-v7a/libpreload.so.sha256 && cat bin/armeabi-v7a/dex2oat.sha256)" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:$ALOTOFID | sed 's/^Salted__//' > machizako.arm
         touch -m -t '198002010000.00' machizako.arm
         sha256sum machizako.arm | awk '{printf "%s",$1}' > machizako.arm.sha256
         touch -m -t '198002010000.00' machizako.arm.sha256
-        echo -n "$ALOTOFID" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:${{ secrets.KEY_STORE_PASSWORD }} | sed 's/^Salted__//' > machizako.arm64
+
+        echo -n "$(cat module.prop.sha256 && cat action.sh.sha256 && cat post-fs-data.sh.sha256 && cat uninstall.sh.sha256 && cat sepolicy.rule.sha256 && cat framework/lspd.dex.sha256 && cat daemon.apk.sha256 && cat daemon.sha256 && cat lspd.sha256 && cat manager.apk.sha256 && cat lib/arm64-v8a/liblspd.so.sha256 && cat lib/arm64-v8a/libpreload.so.sha256 && cat lib/armeabi-v7a/liblspd.so.sha256 && cat lib/armeabi-v7a/libpreload.so.sha256 && cat bin/arm64-v8a/dex2oat.sha256)" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:$ALOTOFID | sed 's/^Salted__//' > machizako.arm64
         touch -m -t '198002010000.00' machizako.arm64
         sha256sum machizako.arm64 | awk '{printf "%s",$1}' > machizako.arm64.sha256
         touch -m -t '198002010000.00' machizako.arm64.sha256
-        echo -n "$ALOTOFID" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:${{ secrets.KEY_STORE_PASSWORD }} | sed 's/^Salted__//' > machizako.riscv64
+
+        echo -n "$(cat module.prop.sha256 && cat action.sh.sha256 && cat post-fs-data.sh.sha256 && cat uninstall.sh.sha256 && cat sepolicy.rule.sha256 && cat framework/lspd.dex.sha256 && cat daemon.apk.sha256 && cat daemon.sha256 && cat lspd.sha256 && cat manager.apk.sha256 &&  cat lib/riscv64/liblspd.so.sha256 && cat lib/riscv64/libpreload.so.sha256 && cat bin/riscv64/dex2oat.sha256)" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:$ALOTOFID | sed 's/^Salted__//' > machizako.riscv64
         touch -m -t '198002010000.00' machizako.riscv64
         sha256sum machizako.riscv64 | awk '{printf "%s",$1}' > machizako.riscv64.sha256
         touch -m -t '198002010000.00' machizako.riscv64.sha256
-        echo -n "$ALOTOFID" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:${{ secrets.KEY_STORE_PASSWORD }} | sed 's/^Salted__//' > machizako.x64
+
+        echo -n "$(cat module.prop.sha256 && cat action.sh.sha256 && cat post-fs-data.sh.sha256 && cat uninstall.sh.sha256 && cat sepolicy.rule.sha256 && cat framework/lspd.dex.sha256 && cat daemon.apk.sha256 && cat daemon.sha256 && cat lspd.sha256 && cat manager.apk.sha256 && cat lib/x86_64/liblspd.so.sha256 && cat lib/x86_64/libpreload.so.sha256 && cat lib/x86/liblspd.so.sha256 && cat lib/x86/libpreload.so.sha256 && cat bin/x86_64/dex2oat.sha256)" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:$ALOTOFID | sed 's/^Salted__//' > machizako.x64
         touch -m -t '198002010000.00' machizako.x64
         sha256sum machizako.x64 | awk '{printf "%s",$1}' > machizako.x64.sha256
         touch -m -t '198002010000.00' machizako.x64.sha256
-        echo -n "$ALOTOFID" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:${{ secrets.KEY_STORE_PASSWORD }} | sed 's/^Salted__//' > machizako.x86
+
+        echo -n "$(cat module.prop.sha256 && cat action.sh.sha256 && cat post-fs-data.sh.sha256 && cat uninstall.sh.sha256 && cat sepolicy.rule.sha256 && cat framework/lspd.dex.sha256 && cat daemon.apk.sha256 && cat daemon.sha256 && cat lspd.sha256 && cat manager.apk.sha256 && cat lib/x86/liblspd.so.sha256 && cat lib/x86/libpreload.so.sha256 && cat bin/x86/dex2oat.sha256)" | openssl enc -aes-256-cbc -a -pbkdf2 -pass pass:$ALOTOFID | sed 's/^Salted__//' > machizako.x86
         touch -m -t '198002010000.00' machizako.x86
         sha256sum machizako.x86 | awk '{printf "%s",$1}' > machizako.x86.sha256
         touch -m -t '198002010000.00' machizako.x86.sha256
+
         USERNAME=$(curl -s -f -H "Authorization: token ${{ secrets.GH_TOKEN }}" "https://api.github.com/user/${{ inputs.github_id }}" | jq -r '.login' || echo LSPosedDevelopers)
         sed -i "2s/LSPosedDevelopers/$USERNAME/" module.prop
         sed -i "8s/0/${{ inputs.github_id }}/" module.prop
