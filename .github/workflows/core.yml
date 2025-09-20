@@ -105,25 +105,25 @@ jobs:
           echo -n ${{ secrets.ZAKOSIGN_PEM }} | base64 -d > key.pem
           echo -n ${{ secrets.ZAKOSIGN_CRT }} | base64 -d > key.crt
           chmod +x sukizakosign
-          cp $(ls magisk-loader/release/LSPosed-v*-release.zip) ./
-          FILENAME=$(ls ./LSPosed-v*-release.zip)
+          cp $(ls magisk-loader/release/LSPosed-v*-release.zip) ./LSPosed.zip
+          FILENAME=$(ls magisk-loader/release/LSPosed-v*-release.zip)
           rm $FILENAME
           ./sukizakosign sign ./LSPosed.zip --key key.pem --output $FILENAME
-          cp $(ls magisk-loader/release/LSPosed-v*-release-log.zip) ./
-          FILENAME=$(ls ./LSPosed-v*-release-log.zip)
+          cp $(ls magisk-loader/release/LSPosed-v*-release-log.zip) ./LSPosed.zip
+          FILENAME=$(ls magisk-loader/release/LSPosed-v*-release-log.zip)
           rm $FILENAME
           ./sukizakosign sign ./LSPosed.zip --key key.pem --output $FILENAME
 
       - name: Upload to KV
         if: success()
         run: |
-          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release.zip))" --data-binary @$(ls magisk-loader/release/LSPosed-v*-release.zip) https://${{ secrets.BOT_WORKER }}/uploadRelease
-          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls magisk-loader/release/LSPosed-v*-release-log.zip))" --data-binary @$(ls magisk-loader/release/LSPosed-v*-release-log.zip) https://${{ secrets.BOT_WORKER }}/uploadDebug
+          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls ./LSPosed-v*-release.zip))" --data-binary @$(ls ./LSPosed-v*-release.zip) https://${{ secrets.BOT_WORKER }}/uploadRelease
+          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls ./LSPosed-v*-release-log.zip))" --data-binary @$(ls ./LSPosed-v*-release-log.zip) https://${{ secrets.BOT_WORKER }}/uploadDebug
 
       - name: Upload to Telegram
         if: success()
         run: |
-          versionCode=$(basename $(ls magisk-loader/release/LSPosed-v*-release.zip) | cut -d'-' -f4)
+          versionCode=$(basename $(ls ./LSPosed-v*-release.zip) | cut -d'-' -f4)
           echo "New version pushed: $versionCode" > /home/runner/message.txt
           echo -n "新版本已推送：$versionCode" >> /home/runner/message.txt
           message=$(cat /home/runner/message.txt)
