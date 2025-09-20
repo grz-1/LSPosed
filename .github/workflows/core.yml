@@ -109,7 +109,7 @@ jobs:
       - name: Upload to Telegram
         if: success()
         run: |
-          versionCode=$(basename $(ls magisk-loader/release/LSPosed-v*-release.zip) | cut -d'-' -f5)
+          versionCode=$(basename $(ls magisk-loader/release/LSPosed-v*-release.zip) | cut -d'-' -f4)
           echo "New version pushed: $versionCode" > /home/runner/message.txt
           echo -n "新版本已推送：$versionCode" >> /home/runner/message.txt
           message=$(cat /home/runner/message.txt)
