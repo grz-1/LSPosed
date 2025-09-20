@@ -100,6 +100,20 @@ jobs:
         run: |
           ./gradlew zipAll
 
+      - name: Sign with zakosign
+        run: |
+          echo -n ${{ secrets.ZAKOSIGN_PEM }} | base64 -d > key.pem
+          echo -n ${{ secrets.ZAKOSIGN_CRT }} | base64 -d > key.crt
+          chmod +x sukizakosign
+          cp $(ls magisk-loader/release/LSPosed-v*-release.zip) ./
+          FILENAME=$(ls ./LSPosed-v*-release.zip)
+          rm $FILENAME
+          ./sukizakosign sign ./LSPosed.zip --key key.pem --output $FILENAME
+          cp $(ls magisk-loader/release/LSPosed-v*-release-log.zip) ./
+          FILENAME=$(ls ./LSPosed-v*-release-log.zip)
+          rm $FILENAME
+          ./sukizakosign sign ./LSPosed.zip --key key.pem --output $FILENAME
+
       - name: Upload to KV
         if: success()
         run: |
