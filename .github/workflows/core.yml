@@ -116,11 +116,9 @@ jobs:
           chmod +x sukizakosign
           cp $(ls magisk-loader/release/LSPosed-v*-release.zip) ./LSPosed.zip
           FILENAME=$(basename $(ls magisk-loader/release/LSPosed-v*-release.zip))
-          rm $FILENAME
           ./sukizakosign sign ./LSPosed.zip --key key.pem --output $FILENAME
           cp $(ls magisk-loader/release/LSPosed-v*-release-log.zip) ./LSPosed.zip
           FILENAME=$(basename $(ls magisk-loader/release/LSPosed-v*-release-log.zip))
-          rm $FILENAME
           ./sukizakosign sign ./LSPosed.zip --key key.pem --output $FILENAME
 
       - name: Upload to KV
