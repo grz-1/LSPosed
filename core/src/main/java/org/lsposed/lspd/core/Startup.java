@@ -81,6 +81,6 @@ public class Startup {
         LSPosedContext.isSystemServer = isSystem;
         LSPosedContext.appDir = appDir;
         LSPosedContext.processName = processName;
-        PrebuiltMethodsDeopter.deoptBootMethods(); // do it once for secondary zygote
+        PrebuiltMethodsDeopter.deoptBootMethods(null); // do it once for secondary zygote
     }
 }

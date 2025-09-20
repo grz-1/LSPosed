@@ -65,6 +65,14 @@ public class PrebuiltMethodsDeopter {
 
     public static void deoptBootMethods() {
         // todo check if has been done before
+        deoptBootMethods(null);
+    }
+
+    public static void deoptBootMethods(String packageName) {
+        if ("com.snapchat.android".equals(packageName)) {
+            Hookers.logD("Skipping deoptimization for Snapchat to preserve bridge connection");
+            return;
+        }
         deoptMethods(KEY_BOOT_IMAGE, null);
     }
 

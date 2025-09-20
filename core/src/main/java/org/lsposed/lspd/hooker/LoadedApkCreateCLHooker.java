@@ -98,6 +98,11 @@ public class LoadedApkCreateCLHooker implements XposedInterface.Hooker {
                 packageName = "system";
             }
 
+            if ("com.snapchat.android".equals(packageName)) {
+                Hookers.logD("Skipping Xposed initialization for Snapchat to preserve bridge connection");
+                return;
+            }
+
             Object mAppDir = XposedHelpers.getObjectField(loadedApk, "mAppDir");
             ClassLoader classLoader = (ClassLoader) XposedHelpers.getObjectField(loadedApk, "mClassLoader");
             Hookers.logD("LoadedApk#createClassLoader ends: " + mAppDir + " -> " + classLoader);
