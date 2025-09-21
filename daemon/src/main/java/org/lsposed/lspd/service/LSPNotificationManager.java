@@ -281,6 +281,59 @@ public class LSPNotificationManager {
         }
     }
 
+    static void notifyStatusNotificationSafeMode() {
+        Log.d(TAG, "Showing status notification(safemode)");
+        var context = new FakeContext();
+        var notification = buildStatusNotificationSafeMode(context);
+
+        if (notification == null) {
+            Log.e(TAG, "Failed to build status notification(safemode)");
+            return;
+        }
+
+        try {
+            var nm = getNotificationManager();
+            createNotificationChannel(nm);
+            nm.enqueueNotificationWithTag(ANDROID_PACKAGE, opPkg, null,
+                    STATUS_NOTIFICATION_ID, notification, 0);
+            Log.d(TAG, "Status notification enqueued successfully(safemode)");
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to show status notification(safemode)", e);
+        }
+    }
+
+    private static Notification buildStatusNotificationSafeMode(Context context) {
+        try {
+            var intent = new Intent(openManagerAction);
+            intent.setPackage(ANDROID_PACKAGE);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+
+            Icon icon = getNotificationIcon();
+            if (icon == null) {
+                Log.e(TAG, "Failed to get notification icon for status notification");
+                return null;
+            }
+
+            var builder = new Notification.Builder(context, STATUS_CHANNEL_ID)
+                    .setContentTitle(context.getString(R.string.lsposed_safemode_notification_title))
+                    .setContentText(context.getString(R.string.lsposed_safemode_notification_content))
+                    .setSmallIcon(icon)
+                    .setContentIntent(PendingIntent.getBroadcast(context, 1, intent, flags))
+                    .setVisibility(Notification.VISIBILITY_SECRET)
+                    .setColor(0xFFF48FB1)
+                    .setOngoing(true)
+                    .setAutoCancel(false);
+
+            Notification notification = builder.build();
+            notification.extras.putString("android.substName", "LSPosed");
+            Log.d(TAG, "Status notification built successfully");
+            return notification;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to build status notification", e);
+            return null;
+        }
+    }
+
     static void cancelStatusNotification() {
         Log.d(TAG, "Cancelling status notification");
         try {

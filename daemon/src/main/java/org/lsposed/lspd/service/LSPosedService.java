@@ -226,6 +226,7 @@ public class LSPosedService extends ILSPosedService.Stub {
             LSPNotificationManager.notifyStatusNotification();
         } else {
             LSPNotificationManager.cancelStatusNotification();
+            LSPNotificationManager.notifyStatusNotificationSafeMode();
         }
     }
 
@@ -237,6 +238,7 @@ public class LSPosedService extends ILSPosedService.Stub {
             LSPNotificationManager.notifyStatusNotification();
         } else {
             LSPNotificationManager.cancelStatusNotification();
+            LSPNotificationManager.notifyStatusNotificationSafeMode();
         }
     }
 
