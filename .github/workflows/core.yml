@@ -127,11 +127,10 @@ jobs:
           curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls ./LSPosed-v*-release.zip))" --data-binary @$(ls ./LSPosed-v*-release.zip) https://${{ secrets.BOT_WORKER }}/uploadRelease
           curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls ./LSPosed-v*-release-log.zip))" --data-binary @$(ls ./LSPosed-v*-release-log.zip) https://${{ secrets.BOT_WORKER }}/uploadDebug
 
-      - name: Upload to Telegram
+      - name: 上传编译资产
         if: success()
-        run: |
-          versionCode=$(basename $(ls ./LSPosed-v*-release.zip) | cut -d'-' -f4)
-          echo "New version pushed: $versionCode" > /home/runner/message.txt
-          echo -n "新版本已推送：$versionCode" >> /home/runner/message.txt
-          message=$(cat /home/runner/message.txt)
-          curl -s -X POST -H "Content-Type: application/json" -d '{"chat_id": "${{ secrets.CHAT_ID }}", "message_thread_id": "${{ secrets.MESSAGE_THREAD_ID }}", "text": "'"$message"'", "reply_markup": {"inline_keyboard": [[{"text": "Download / 下载", "url": "https://t.me/${{ secrets.BOT_NAME }}?start=dl"}]]}}' "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" >> /dev/null
+        uses: actions/upload-artifact@v4
+        with:
+          name: LSPosed
+          path: |
+            *.zip
