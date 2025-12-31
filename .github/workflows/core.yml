@@ -100,32 +100,13 @@ jobs:
         run: |
           ./gradlew zipAll
 
-      - name: Build zakosign
-        run: |
-          git clone https://github.com/Lama3L9R/zakosign.git --depth=1
-          cd zakosign
-          echo '#include <openssl/x509v3.h>' | cat - src/cli.c > temp && mv temp src/cli.c
-          make
-          mv ./bin/zakosign ./../sukizakosign
-          cd ..
 
-      - name: Sign with zakosign
+      - name: Copy LSPosed
         run: |
-          echo -n ${{ secrets.ZAKOSIGN_PEM }} | base64 -d > key.pem
-          echo -n ${{ secrets.ZAKOSIGN_CRT }} | base64 -d > key.crt
-          chmod +x sukizakosign
-          cp $(ls magisk-loader/release/LSPosed-v*-release.zip) ./LSPosed.zip
-          FILENAME=$(basename $(ls magisk-loader/release/LSPosed-v*-release.zip))
-          ./sukizakosign sign ./LSPosed.zip --key key.pem --output $FILENAME
-          cp $(ls magisk-loader/release/LSPosed-v*-release-log.zip) ./LSPosed.zip
-          FILENAME=$(basename $(ls magisk-loader/release/LSPosed-v*-release-log.zip))
-          ./sukizakosign sign ./LSPosed.zip --key key.pem --output $FILENAME
+          
+          cp $(ls magisk-loader/release/LSPosed-v*-release.zip) ./LSPosed-release.zip
+          cp $(ls magisk-loader/release/LSPosed-v*-release-log.zip) ./LSPosed-debug.zip
 
-      - name: Upload to KV
-        if: success()
-        run: |
-          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls ./LSPosed-v*-release.zip))" --data-binary @$(ls ./LSPosed-v*-release.zip) https://${{ secrets.BOT_WORKER }}/uploadRelease
-          curl -X POST -H "x-token: ${{ secrets.BOT_TOKEN }}" -H "x-filename: $(basename $(ls ./LSPosed-v*-release-log.zip))" --data-binary @$(ls ./LSPosed-v*-release-log.zip) https://${{ secrets.BOT_WORKER }}/uploadDebug
 
       - name: 上传编译资产
         if: success()
